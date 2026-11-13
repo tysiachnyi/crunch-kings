@@ -4,13 +4,13 @@
     {
       "name": "web",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@crunchy/web", "dev", "--port", "5173", "--strictPort"],
+      "runtimeArgs": ["--filter", "@crunch-kings/web", "dev", "--port", "5173", "--strictPort"],
       "port": 5173
     },
     {
       "name": "lab",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@crunchy/scene-viewer", "dev", "--port", "5174", "--strictPort"],
+      "runtimeArgs": ["--filter", "@crunch-kings/scene-viewer", "dev", "--port", "5174", "--strictPort"],
       "port": 5174
     }
   ]

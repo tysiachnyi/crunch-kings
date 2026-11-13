@@ -1,17 +1,18 @@
 {
-  "name": "crunchy-fellos",
+  "name": "crunch-kings",
   "private": true,
   "packageManager": "pnpm@11.21.0",
   "scripts": {
-    "dev": "pnpm --filter @crunchy/web dev",
-    "lab": "pnpm --filter @crunchy/scene-viewer dev",
-    "build": "pnpm --filter @crunchy/web build",
-    "preview": "pnpm --filter @crunchy/web preview",
+    "dev": "pnpm --filter @crunch-kings/web dev",
+    "lab": "pnpm --filter @crunch-kings/scene-viewer dev",
+    "build": "pnpm --filter @crunch-kings/web build",
+    "preview": "pnpm --filter @crunch-kings/web preview",
     "test": "pnpm -r --if-present test",
     "typecheck": "pnpm -r --if-present typecheck",
-    "scene": "/Applications/Blender.app/Contents/MacOS/Blender --background --factory-startup --python assets/blender/build_stage1.py"
+    "scene": "sh assets/blender/build_all.sh"
   },
   "devDependencies": {
+    "@gltf-transform/cli": "^4.5.1",
     "typescript": "^7.0.2",
     "vitest": "^5.1.0"
   }

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei'
-import { OfficeCanvas } from '@crunchy/scene'
+import { OfficeCanvas } from '@crunch-kings/scene'
 
 export function App() {
   const [selected, setSelected] = useState<string | null>(null)

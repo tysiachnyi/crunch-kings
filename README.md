@@ -1,6 +1,8 @@
-# Crunchy Fellos
+# Crunch Kings
 
 A cozy 3D tycoon game about running a game studio. You hire weird people, ship games, fight rivals, enter competitions and survive angry fans.
+
+The demo covers the garage years, 1980-1989: you, one garage friend, $20,000, and ten years to make a name.
 
 The first target is the browser, so friends can play a demo. iOS and macOS come later.
 
@@ -9,12 +11,12 @@ The first target is the browser, so friends can play a demo. iOS and macOS come 
 | Folder | What it holds |
 | --- | --- |
 | `apps/web` | The playable browser game: Vite, React, React Three Fiber, HUD. |
-| `packages/game-core` | Game rules as pure TypeScript: studio, staff, projects, releases, balance. No rendering. Vitest tests. |
-| `packages/scene` | The shared 3D office: model loading, isometric camera, lights, post effects, click selection. |
+| `packages/game-core` | Game rules as pure TypeScript: calendar, staff, projects, reviews, sales, rivals, awards, fans, events, contracts, research. Numbers live in `balance.ts`, content tables in `content.ts`. No rendering. Vitest tests, and `testkit.ts` with a bot that plays the whole demo. |
+| `packages/scene` | The shared 3D office: the garage and the small office, characters in seats with simple animation, isometric camera, lights, post effects, click selection. |
 | `prototyping/` | Experiments and test benches. They are not part of the shipped game. |
 | `prototyping/scene-viewer` | Shows the office model with a free orbit camera, to check new assets. |
 | `assets/blender` | Python scripts that build every 3D asset in Blender. They are the source of truth for models. |
-| `assets/public` | Files that the apps serve as-is, for example `models/stage1.glb`. Both apps use this folder as `publicDir`. |
+| `assets/public` | Files that the apps serve as-is: `models/stage1.glb` (garage), `models/stage2.glb` (small office), `models/characters.glb`. Both apps use this folder as `publicDir`. |
 | `assets/renders` | Preview renders from Blender. |
 | `docs/adr` | Architecture decision records. |
 
@@ -52,7 +54,7 @@ pnpm typecheck
 pnpm scene
 ```
 
-This rebuilds the 3D office in Blender, exports `assets/public/models/stage1.glb` and renders previews. It needs Blender at `/Applications/Blender.app`. Add `-- --no-render` to skip the renders.
+This rebuilds the characters, the garage and the small office in Blender, exports and compresses the `.glb` files and renders previews. It needs Blender at `/Applications/Blender.app` (or set `BLENDER`). Add `--no-render` to skip the renders.
 
 ```bash
 pnpm build

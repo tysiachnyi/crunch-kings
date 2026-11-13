@@ -32,6 +32,15 @@ def _keep_lower_half(obj):
     bm.free()
 
 
+def _keep_upper_half(obj):
+    import bmesh
+    bm = bmesh.new()
+    bm.from_mesh(obj.data)
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if v.co.y < -0.01], context="VERTS")
+    bm.to_mesh(obj.data)
+    bm.free()
+
+
 def _hair(g, s, z):
     style = s["hair_style"]
     color = s["hair"]
@@ -55,7 +64,8 @@ def _hair(g, s, z):
 
 
 def _headphones(g, z, color):
-    torus("Phones_Band", HEAD_W / 2 + 0.035, 0.016, (0, 0.0, z + 0.04), color, g, rot=(0, 90, 0), major_seg=20, minor_seg=6)
+    band = torus("Phones_Band", HEAD_W / 2 + 0.035, 0.016, (0, 0.0, z + 0.02), color, g, rot=(90, 0, 0), major_seg=24, minor_seg=6)
+    _keep_upper_half(band)
     for side, sx in (("L", -1), ("R", 1)):
         cylinder(f"Phones_Cup{side}", 0.07, 0.05, (sx * (HEAD_W / 2 + 0.03), 0.01, z - 0.01), color, g, verts=16, rot=(0, 90, 0), bevel=0.012)
         cylinder(f"Phones_Pad{side}", 0.055, 0.02, (sx * (HEAD_W / 2 + 0.06), 0.01, z - 0.01), "coral", g, verts=16, rot=(0, 90, 0), bevel=0.006)
@@ -114,59 +124,113 @@ def _limb(g, name, a, b, radius, mat):
     cylinder(name, radius, length + radius * 0.6, _lerp(a, b, 0.5), mat, g, verts=12, rot=_limb_rot(a, b), bevel=radius * 0.45)
 
 
+def _shift(p, o):
+    return (p[0] - o[0], p[1] - o[1], p[2] - o[2])
+
+
 def character(name, parent, loc, rot_z, style, pose="sit"):
     g = group(name, parent, loc, rot_z)
     s = dict(style)
     s["skin"] = material(style["skin"], emission=0.35, roughness=1.0)
+    body = group(f"{name}_Body", g)
     if pose == "sit":
         z_hip = 0.6
-        _torso(g, s, z_hip, lean=6)
+        _torso(body, s, z_hip, lean=6)
         for side, sx in (("L", -1), ("R", 1)):
             hip = (sx * 0.09, -0.02, z_hip - 0.02)
             knee = (sx * 0.1, -0.38, z_hip - 0.02)
             foot = (sx * 0.11, -0.42, 0.0)
-            _leg(g, s, side, hip, knee, foot)
+            _leg(body, s, side, hip, knee, foot)
             shoulder = (sx * 0.2, 0.0, z_hip + 0.31)
             elbow = (sx * 0.24, -0.16, z_hip + 0.16)
             hand = (sx * 0.15, -0.4, z_hip + 0.2)
-            _arm(g, s, side, shoulder, elbow, hand)
+            arm = group(f"{name}_Arm{side}", g, shoulder)
+            _arm(arm, s, side, (0, 0, 0), _shift(elbow, shoulder), _shift(hand, shoulder))
     else:
         z_hip = 0.56
-        _torso(g, s, z_hip)
+        _torso(body, s, z_hip)
         for side, sx in (("L", -1), ("R", 1)):
             hip = (sx * 0.09, 0.0, z_hip - 0.02)
             knee = (sx * 0.1, -0.01, 0.3)
             foot = (sx * 0.11, 0.02, 0.0)
-            _leg(g, s, side, hip, knee, foot)
-        _arm(g, s, "L", (-0.2, 0.0, z_hip + 0.31), (-0.25, 0.02, z_hip + 0.1), (-0.25, -0.02, z_hip - 0.06))
-        _arm(g, s, "R", (0.2, 0.0, z_hip + 0.31), (0.26, -0.03, z_hip + 0.12), (0.14, -0.2, z_hip + 0.2))
-        cylinder("HeldMug", 0.042, 0.1, (0.12, -0.27, z_hip + 0.26), "mint", g, verts=12)
-        cylinder("HeldCoffee", 0.036, 0.005, (0.12, -0.27, z_hip + 0.31), "wood_dark", g, verts=12, bevel=0.0)
-    head_z = z_hip + 0.42 + HEAD_H / 2
-    _head(g, s, head_z)
-    _hair(g, s, head_z)
+            _leg(body, s, side, hip, knee, foot)
+        _arm(body, s, "L", (-0.2, 0.0, z_hip + 0.31), (-0.25, 0.02, z_hip + 0.1), (-0.25, -0.02, z_hip - 0.06))
+        _arm(body, s, "R", (0.2, 0.0, z_hip + 0.31), (0.26, -0.03, z_hip + 0.12), (0.14, -0.2, z_hip + 0.2))
+        cylinder("HeldMug", 0.042, 0.1, (0.12, -0.27, z_hip + 0.26), "mint", body, verts=12)
+        cylinder("HeldCoffee", 0.036, 0.005, (0.12, -0.27, z_hip + 0.31), "wood_dark", body, verts=12, bevel=0.0)
+    neck_z = z_hip + 0.4
+    head = group(f"{name}_Head", g, (0, 0, neck_z))
+    head_z = z_hip + 0.42 + HEAD_H / 2 - neck_z
+    _head(head, s, head_z)
+    _hair(head, s, head_z)
     if s.get("headphones"):
-        _headphones(g, head_z, s["headphones"])
+        _headphones(head, head_z, s["headphones"])
     if s.get("glasses"):
-        _glasses(g, head_z)
+        _glasses(head, head_z)
     return g
 
 
 STYLES = {
-    "coder": {
+    "founder_coder": {
         "skin": "skin_a", "hair": "hair_ginger", "hair_style": "messy",
         "top": "navy", "top_dark": "ui_dark", "pants": "pants_dark", "shoes": "red",
         "headphones": "black", "glasses": True, "logo": "yellow", "mouth": "flat", "brow_tilt": -10,
     },
-    "artist": {
+    "founder_designer": {
+        "skin": "skin_c", "hair": "hair_black", "hair_style": "messy",
+        "top": "coral", "top_dark": "red", "pants": "denim", "shoes": "shoe",
+        "glasses": True, "logo": "yellow", "brow_tilt": 4,
+    },
+    "founder_artist": {
+        "skin": "skin_b", "hair": "hair_brown", "hair_style": "bun",
+        "top": "leaf", "top_dark": "green", "pants": "pants_dark", "shoes": "red",
+        "logo": "yellow",
+    },
+    "maggie": {
         "skin": "skin_b", "hair": "hair_purple", "hair_style": "bun",
         "top": "mustard", "top_dark": "wood", "pants": "denim", "shoes": "shoe",
         "logo": "coral",
     },
-    "producer": {
+    "danny": {
         "skin": "skin_c", "hair": "hair_black", "hair_style": "beanie",
         "accent": "coral", "accent2": "red",
         "top": "leaf", "top_dark": "green", "pants": "pants_dark", "shoes": "shoe",
-        "brow_tilt": 4,
+        "mouth": "flat", "brow_tilt": 4,
+    },
+    "roy": {
+        "skin": "skin_a", "hair": "hair_brown", "hair_style": "messy",
+        "top": "red", "top_dark": "baseboard", "pants": "denim", "shoes": "shoe_dark",
+        "headphones": "mustard", "logo": "white",
+    },
+    "hire_coder": {
+        "skin": "skin_b", "hair": "hair_black", "hair_style": "messy",
+        "top": "blue", "top_dark": "navy", "pants": "pants_dark", "shoes": "shoe",
+        "glasses": True, "mouth": "flat",
+    },
+    "hire_coder2": {
+        "skin": "skin_a", "hair": "hair_brown", "hair_style": "beanie",
+        "accent": "navy", "accent2": "blue",
+        "top": "beige_dark", "top_dark": "wood", "pants": "denim", "shoes": "red",
+    },
+    "hire_artist": {
+        "skin": "skin_c", "hair": "hair_ginger", "hair_style": "bun",
+        "top": "pink", "top_dark": "coral", "pants": "pants_dark", "shoes": "shoe",
+        "logo": "white",
+    },
+    "hire_designer": {
+        "skin": "skin_a", "hair": "hair_black", "hair_style": "bun",
+        "top": "mint", "top_dark": "leaf", "pants": "denim", "shoes": "shoe_dark",
+        "glasses": True,
+    },
+    "hire_sound": {
+        "skin": "skin_b", "hair": "hair_ginger", "hair_style": "messy",
+        "top": "ui_dark", "top_dark": "black", "pants": "denim", "shoes": "red",
+        "headphones": "coral",
+    },
+    "hire_writer": {
+        "skin": "skin_c", "hair": "hair_brown", "hair_style": "beanie",
+        "accent": "mustard", "accent2": "wood",
+        "top": "white", "top_dark": "beige_dark", "pants": "pants_dark", "shoes": "shoe",
+        "glasses": True, "brow_tilt": -6,
     },
 }

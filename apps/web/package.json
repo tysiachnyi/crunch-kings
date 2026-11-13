@@ -1,5 +1,5 @@
 {
-  "name": "@crunchy/web",
+  "name": "@crunch-kings/web",
   "private": true,
   "version": "0.0.1",
   "type": "module",
@@ -17,8 +17,8 @@
     "vite": "^8.3.8"
   },
   "dependencies": {
-    "@crunchy/game-core": "workspace:*",
-    "@crunchy/scene": "workspace:*",
+    "@crunch-kings/game-core": "workspace:*",
+    "@crunch-kings/scene": "workspace:*",
     "@react-three/drei": "^10.7.9",
     "@react-three/fiber": "^9.8.2",
     "@react-three/postprocessing": "^3.2.2",

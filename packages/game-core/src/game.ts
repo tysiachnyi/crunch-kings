@@ -1,90 +1,116 @@
-import { COMBO, DESIGN_WEIGHT, PAYDAY_EVERY_WEEKS, QUALITY_CAP, PRICE_PER_COPY, PROJECT_WEEKS, START_MONEY } from './balance'
-import { nextRandom } from './rng'
-import type { Employee, GameProject, GameState, ProjectPlan, Release } from './types'
+import { FAN_MOOD_START, HYPE_DECAY, RP_IDLE_PER_STAFF, RP_WORK_PER_STAFF, START_MONEY } from './balance'
+import { checkMilestones, generateContracts, workOnContract, yearEnd } from './business'
+import { dateLabel, demoEndWeek, isNewMonth, isNewYear, weekOfYear } from './calendar'
+import { resolveEvent as resolveEventWith, storyOnRelease, weeklyEvents } from './events'
+import { weeklyFans } from './fans'
+import { awardsShow, initialRivals, nominations, paySales, releaseGame, weeklyRivals, yearlyRivals } from './market'
+import { workOnProject } from './project'
+import { createRng } from './rng'
+import { createFounder, createGarageFriend } from './founders'
+import { generateCandidates, monthlyCosts, weeklyStaff, yearlyRaises } from './staff'
+import type { GameState, NewGameSetup } from './types'
+import { log, money } from './util'
 
-const FOUNDERS: Employee[] = [
-  { id: 'dev-01', name: 'Rusty', role: 'coder', skills: { design: 2, tech: 6 }, salary: 3000 },
-  { id: 'dev-02', name: 'Mira', role: 'artist', skills: { design: 6, tech: 2 }, salary: 3000 },
-  { id: 'dev-03', name: 'Tobi', role: 'producer', skills: { design: 4, tech: 3 }, salary: 3500 },
-]
-
-export function createNewGame(studioName: string, seed = 1): GameState {
-  return {
+export function createNewGame({ studioName, founderName, archetype, seed = 1 }: NewGameSetup): GameState {
+  const rng = createRng(seed)
+  const founder = createFounder(founderName, archetype)
+  const friend = createGarageFriend(archetype)
+  const state: GameState = {
+    version: 3,
     studioName,
+    founderArchetype: archetype,
     week: 1,
     money: START_MONEY,
     fans: 0,
-    staff: FOUNDERS,
+    hype: 0,
+    researchPoints: 0,
+    research: [],
+    platforms: ['vector64'],
+    engines: ['tinker'],
+    ownEngine: null,
+    office: 'garage',
+    staff: [founder, friend],
+    candidates: [],
+    contracts: [],
+    activeContract: null,
     project: null,
     releases: [],
-    log: [{ week: 1, text: `${studioName} opens in a tiny rented room.` }],
-    seed,
+    rivals: initialRivals(rng),
+    rivalReleases: [],
+    fandom: { mood: FAN_MOOD_START, demands: [], reviewBombWeeks: 0, lastLetterWeek: 0 },
+    modifiers: [],
+    pendingEvents: [],
+    awards: [],
+    milestones: [],
+    log: [],
+    loan: null,
+    negativeWeeks: 0,
+    yearStartMoney: START_MONEY,
+    rescueStep: 0,
+    ending: null,
+    lastReleaseId: null,
+    firedEvents: {},
+    seed: rng.seed,
+    nextId: 1,
   }
+  const withCandidates = { ...state, candidates: generateCandidates(state, rng), seed: rng.seed }
+  return log(withCandidates, `January 1980. ${founder.name} and ${friend.name} open ${studioName} in a garage with a used computer and ${money(START_MONEY)} from selling a car.`, 'story')
 }
 
-export function startProject(state: GameState, plan: ProjectPlan): GameState {
-  if (state.project) {
-    throw new Error('A project is already in progress.')
-  }
-  const project: GameProject = { ...plan, weeksLeft: PROJECT_WEEKS, design: 0, tech: 0, bugs: 0 }
-  return log({ ...state, project }, `Work starts on "${plan.title}".`)
+export function isBlocked(state: GameState): boolean {
+  return state.ending !== null || state.pendingEvents.length > 0
 }
 
 export function advanceWeek(state: GameState): GameState {
-  let next: GameState = { ...state, week: state.week + 1 }
-  if (next.project) {
-    next = work(next, next.project)
+  if (isBlocked(state)) return state
+  const rng = createRng(state.seed)
+  let s: GameState = { ...state, week: state.week + 1 }
+
+  if (s.week >= demoEndWeek()) {
+    return log({ ...s, ending: 'demoComplete' }, `${dateLabel(s.week)}. The 80s are over. ${s.studioName} survived the garage years.`, 'story')
   }
-  if (next.week % PAYDAY_EVERY_WEEKS === 0) {
-    const payroll = next.staff.reduce((sum, e) => sum + e.salary, 0)
-    next = log({ ...next, money: next.money - payroll }, `Payday: -$${payroll.toLocaleString('en-US')}.`)
+
+  const busy = s.project !== null || s.activeContract !== null
+  const crunch = s.project?.crunch ?? false
+  const team = s.staff.length
+
+  if (s.project) {
+    const project = workOnProject(s, s.project, rng)
+    if (project.weeksLeft <= 0) {
+      s = storyOnRelease(releaseGame({ ...s, project }, project, rng))
+    } else {
+      s = { ...s, project: { ...project, hype: Math.max(0, project.hype - HYPE_DECAY / 2) } }
+    }
+  } else if (s.activeContract) {
+    s = workOnContract(s, rng)
   }
-  return next
+
+  s = { ...s, researchPoints: s.researchPoints + team * (busy ? RP_WORK_PER_STAFF : RP_IDLE_PER_STAFF) }
+  s = weeklyStaff(s, busy, crunch)
+  s = paySales(s)
+  s = { ...s, hype: Math.max(0, s.hype - HYPE_DECAY) }
+  s = { ...s, modifiers: s.modifiers.map((m) => ({ ...m, weeksLeft: m.weeksLeft - 1 })).filter((m) => m.weeksLeft > 0) }
+
+  if (isNewMonth(s.week)) {
+    const costs = monthlyCosts(s)
+    s = log({ ...s, money: s.money - costs }, `Salaries and rent: -${money(costs)}.`)
+    s = { ...s, candidates: generateCandidates(s, rng), contracts: generateContracts(s, rng) }
+  }
+  if (isNewYear(s.week)) {
+    s = yearlyRaises(yearEnd(s))
+    s = yearlyRivals(s, rng)
+  }
+  s = weeklyRivals(s, rng)
+  if (weekOfYear(s.week) === 48) s = nominations(s)
+  if (weekOfYear(s.week) === 50) s = awardsShow(s)
+  s = weeklyFans(s, rng)
+  s = weeklyEvents(s, rng)
+  s = checkMilestones(s)
+  return { ...s, seed: rng.seed }
 }
 
-export function reviewScore(project: GameProject): number {
-  const total = project.design + project.tech
-  if (total === 0) return 1
-  const target = DESIGN_WEIGHT[project.genre]
-  const balance = 1 - Math.abs(project.design / total - target)
-  const quality = Math.min(1, total / QUALITY_CAP)
-  const bugPenalty = Math.min(0.4, project.bugs / Math.max(total, 1))
-  const raw = 10 * quality * balance * COMBO[project.topic][project.genre] * (1 - bugPenalty)
-  return Math.round(Math.max(1, Math.min(10, raw)) * 10) / 10
-}
-
-function work(state: GameState, project: GameProject): GameState {
-  let seed = state.seed
-  let { design, tech, bugs } = project
-  for (const employee of state.staff) {
-    let roll: number
-    ;[roll, seed] = nextRandom(seed)
-    const focus = 0.75 + roll * 0.5
-    design += employee.skills.design * focus
-    tech += employee.skills.tech * focus
-    bugs += roll < 0.2 ? 1 : 0
-  }
-  const updated: GameProject = { ...project, design, tech, bugs, weeksLeft: project.weeksLeft - 1 }
-  if (updated.weeksLeft > 0) {
-    return { ...state, seed, project: updated }
-  }
-  return release({ ...state, seed, project: null }, updated)
-}
-
-function release(state: GameState, project: GameProject): GameState {
-  const score = reviewScore(project)
-  const fansGained = Math.round(score * score * 40)
-  const sales = Math.round(2000 * score * (1 + state.fans / 5000))
-  const entry: Release = { title: project.title, week: state.week, score, sales, fansGained }
-  const next: GameState = {
-    ...state,
-    money: state.money + sales * PRICE_PER_COPY,
-    fans: state.fans + fansGained,
-    releases: [...state.releases, entry],
-  }
-  return log(next, `"${project.title}" ships. Critics give it ${score}/10. ${sales.toLocaleString('en-US')} copies sold.`)
-}
-
-function log(state: GameState, text: string): GameState {
-  return { ...state, log: [...state.log, { week: state.week, text }] }
+export function resolveEvent(state: GameState, choiceId: string): GameState {
+  const rng = createRng(state.seed)
+  const next = resolveEventWith(state, choiceId, rng)
+  return { ...next, seed: rng.seed }
 }

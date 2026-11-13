@@ -1,4 +1,4 @@
-# Crunchy Fellos - agent notes
+# Crunch Kings - agent notes
 
 Read `README.md` for the layout and the commands.
 
