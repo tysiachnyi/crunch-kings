@@ -1,6 +1,10 @@
 # Crunch Kings - agent notes
 
-Read `README.md` for the layout and the commands.
+Read `README.md` for the layout and the commands. Read `docs/wiki/README.md` for the project, the work done so far and the current status.
+
+## Words
+
+`docs/wiki/glossary.md` decides the word for each concept. Use it in code, UI text and docs. When you add a concept, add its word to the glossary in the same change.
 
 ## Where code goes
 
@@ -13,7 +17,7 @@ Read `README.md` for the layout and the commands.
 
 ## Done means
 
-`pnpm typecheck` and `pnpm test` pass, and you checked the change in the browser with the preview servers `web` or `lab` from `.claude/launch.json`.
+`pnpm typecheck` and `pnpm test` pass, and you checked the change in the browser with the preview servers `web` or `lab` from `.claude/launch.json`. Then add a line to `docs/wiki/history.md` and update `docs/wiki/status.md`.
 
 ## Future platforms
 

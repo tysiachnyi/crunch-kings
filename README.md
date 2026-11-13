@@ -19,6 +19,8 @@ The first target is the browser, so friends can play a demo. iOS and macOS come 
 | `assets/public` | Files that the apps serve as-is: `models/stage1.glb` (garage), `models/stage2.glb` (small office), `models/characters.glb`. Both apps use this folder as `publicDir`. |
 | `assets/renders` | Preview renders from Blender. |
 | `docs/adr` | Architecture decision records. |
+| `docs/design` | Design notes, for example the angry fans system. |
+| `docs/wiki` | The project wiki: overview, architecture, game systems, art, UI, history, status, rules for agents and the glossary. Start at `docs/wiki/README.md`. |
 
 The dependency direction is `apps/*` and `prototyping/*` → `packages/scene` and `packages/game-core`. The packages never import from an app.
 
