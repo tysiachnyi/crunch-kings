@@ -1,0 +1,5 @@
+export { OfficeCanvas, BACKDROP_COLOR } from './OfficeCanvas'
+export { OfficeCamera } from './OfficeCamera'
+export { OfficeLights } from './OfficeLights'
+export { OfficePostFx } from './OfficePostFx'
+export { STAGE_MODEL_URL, Stage } from './Stage'

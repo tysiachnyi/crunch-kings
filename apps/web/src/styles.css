@@ -1,0 +1,104 @@
+:root {
+  --bg: #1c1a26;
+  --panel: #2b2540;
+  --panel-shadow: #4a3f6b;
+  --cream: #f6e7d0;
+  --coral: #ff7a59;
+  --yellow: #ffd166;
+  --bad: #ff6b6b;
+}
+
+html, body, #root {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--cream);
+  font-family: ui-rounded, system-ui, sans-serif;
+}
+
+.game {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+}
+
+.card, .hud {
+  position: absolute;
+  background: var(--panel);
+  border-radius: 16px;
+  box-shadow: 0 6px 0 var(--panel-shadow);
+}
+
+.hud {
+  top: 16px;
+  left: 16px;
+  right: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 16px;
+}
+
+.hud .bad { color: var(--bad); }
+
+.side {
+  top: 88px;
+  right: 16px;
+  width: min(280px, calc(100% - 32px));
+  padding: 16px;
+}
+
+.side h2 { margin: 0 0 8px; font-size: 18px; }
+.side p { margin: 6px 0; text-transform: capitalize; }
+.side progress { width: 100%; accent-color: var(--coral); }
+
+form { display: grid; gap: 10px; }
+label { display: grid; gap: 4px; font-size: 13px; opacity: 0.9; }
+
+input, select {
+  font: inherit;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 0;
+  background: var(--cream);
+  color: var(--panel);
+  text-transform: capitalize;
+}
+
+button {
+  font: inherit;
+  font-weight: 700;
+  padding: 6px 14px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--coral);
+  color: var(--panel);
+  cursor: pointer;
+  box-shadow: 0 3px 0 #b8492f;
+}
+
+button.ghost { background: transparent; color: var(--cream); box-shadow: none; text-decoration: underline; }
+
+.review { margin-top: 12px; color: var(--yellow); }
+
+.log {
+  left: 16px;
+  bottom: 16px;
+  width: min(460px, calc(100% - 32px));
+  padding: 10px 16px;
+  font-size: 14px;
+}
+
+.log p { margin: 4px 0; }
+
+.selected {
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  padding: 8px 14px;
+}
+
+@media (max-width: 720px) {
+  .side { top: auto; bottom: 150px; }
+}
