@@ -3,6 +3,7 @@ import { checkMilestones, generateContracts, workOnContract, yearEnd } from './b
 import { dateLabel, demoEndWeek, isNewMonth, isNewYear, weekOfYear } from './calendar'
 import { resolveEvent as resolveEventWith, storyOnRelease, weeklyEvents } from './events'
 import { weeklyFans } from './fans'
+import { awardBadges } from './sales'
 import { awardsShow, initialRivals, nominations, paySales, releaseGame, weeklyRivals, yearlyRivals } from './market'
 import { workOnProject } from './project'
 import { createRng } from './rng'
@@ -16,7 +17,7 @@ export function createNewGame({ studioName, founderName, archetype, seed = 1 }: 
   const founder = createFounder(founderName, archetype)
   const friend = createGarageFriend(archetype)
   const state: GameState = {
-    version: 3,
+    version: 6,
     studioName,
     founderArchetype: archetype,
     week: 1,
@@ -58,7 +59,7 @@ export function createNewGame({ studioName, founderName, archetype, seed = 1 }: 
 }
 
 export function isBlocked(state: GameState): boolean {
-  return state.ending !== null || state.pendingEvents.length > 0
+  return state.ending !== null || state.pendingEvents.length > 0 || state.project?.awaitingPhase === true
 }
 
 export function advanceWeek(state: GameState): GameState {
@@ -101,6 +102,7 @@ export function advanceWeek(state: GameState): GameState {
     s = yearlyRivals(s, rng)
   }
   s = weeklyRivals(s, rng)
+  s = awardBadges(s)
   if (weekOfYear(s.week) === 48) s = nominations(s)
   if (weekOfYear(s.week) === 50) s = awardsShow(s)
   s = weeklyFans(s, rng)

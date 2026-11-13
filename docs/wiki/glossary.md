@@ -45,7 +45,11 @@ The number that fixes all randomness of a run. The same seed and the same choice
 
 **Week**:
 One step of game time.
-_Avoid_: tick, turn, day
+_Avoid_: tick, turn, day (see Day)
+
+**Day**:
+One seventh of a week. Only the sales display uses it. The game rules never step by day.
+_Avoid_: game day, turn
 
 **Ending**:
 The way a run finishes. The demo has two: demo complete and bankrupt.
@@ -152,8 +156,16 @@ The scale of a game project: S, M or L. Bigger games take longer, need more empl
 _Avoid_: scope, budget, tier
 
 **Focus**:
-The split of work over the six skills for a game project. It always adds up to 100.
+The split of work over the six skills for a game project. It always adds up to 100. The game computes it from the weights of the three phases.
 _Avoid_: sliders, priorities, allocation
+
+**Phase**:
+One of three parts of a game project: Foundation, Content and Finish. Before each phase the player sets the weights of its three aspects, and the game waits for that decision.
+_Avoid_: stage, step, milestone (see Milestone), sprint
+
+**Aspect**:
+One of the three parts of work inside a phase, for example Code base or Levels. Each aspect feeds one skill. The player sets a weight from 0 to 100 for it, and its share is its weight divided by the total of the phase.
+_Avoid_: task, slider, category, focus area
 
 **Ideal focus**:
 The focus that suits a genre best. The game never shows it before the first release in that genre.
@@ -244,6 +256,18 @@ _Avoid_: position, ranking, top list
 **Sales**:
 Copies of a release sold, paid week by week after release.
 _Avoid_: revenue (revenue is the money from sales), income, units
+
+**Sales desk**:
+The panel at the top left of the play screen. It shows the sales of the newest release day by day, with its sales badges.
+_Avoid_: sales widget, sales tracker, ticker (see Ticker)
+
+**Sales badge**:
+A stamp that a release earns for its sales, once per release, for example New record or Big seller. The unit tiers are Cult favorite, Big seller, Smash hit and Legend. They are not the same as Hit, which is about the score.
+_Avoid_: achievement (see Milestone), trophy, award (see Awards show), label
+
+**Region**:
+One of six sales areas: the USA, Japan, Germany, the United Kingdom, France and Brazil. Each has a market share and a taste for genres and topics.
+_Avoid_: country, market, territory
 
 **Hit**:
 A release with a score of 8 or more.
@@ -420,6 +444,10 @@ _Avoid_: sidebar, drawer, menu
 **Tip**:
 A short help card for a new player.
 _Avoid_: tutorial step, hint (see Hint), guide
+
+**Ticker**:
+The last three log entries at the bottom left of the play screen.
+_Avoid_: news bar, feed
 
 **Toast**:
 A short red message when an action is not allowed.

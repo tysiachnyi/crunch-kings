@@ -53,6 +53,14 @@ export type Topic =
 
 export type Tag = 'action' | 'brains' | 'social' | 'story' | 'world'
 
+export type RegionId = 'usa' | 'germany' | 'japan' | 'uk' | 'france' | 'brazil'
+
+export type SalesBadge = {
+  id: string
+  week: number
+  label: string
+}
+
 export type GameSize = 'S' | 'M' | 'L'
 
 export type PlatformId = 'vector64' | 'kestrel' | 'funbox'
@@ -83,11 +91,18 @@ export type ProjectPlan = {
   size: GameSize
   platform: PlatformId
   engine: EngineId
-  focus: Focus
   sequelOf?: string
 }
 
+export type PhaseWeights = [number, number, number]
+
 export type GameProject = ProjectPlan & {
+  focus: Focus
+  phase: number
+  awaitingPhase: boolean
+  phaseWeeksLeft: number
+  phaseWeights: PhaseWeights[]
+  phaseStart: Focus
   totalWeeks: number
   weeksLeft: number
   points: Focus
@@ -115,6 +130,8 @@ export type Release = {
   score: number
   reviews: Review[]
   weeklySales: number[]
+  soldWeeks: number[]
+  badges: SalesBadge[]
   totalSales: number
   hint: string | null
   chartRank: number
@@ -223,7 +240,7 @@ export type Loan = {
 }
 
 export type GameState = {
-  version: 3
+  version: 6
   studioName: string
   founderArchetype: Archetype
   week: number

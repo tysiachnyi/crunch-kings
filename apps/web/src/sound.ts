@@ -1,4 +1,4 @@
-export type SoundName = 'click' | 'coin' | 'payday' | 'fanfare' | 'review' | 'ding' | 'bad' | 'hire' | 'research'
+export type SoundName = 'click' | 'coin' | 'payday' | 'fanfare' | 'review' | 'ding' | 'bad' | 'hire' | 'research' | 'stamp'
 
 type Note = { freq: number; at: number; length: number; type?: OscillatorType; volume?: number; slide?: number }
 
@@ -28,6 +28,11 @@ const SOUNDS: Record<SoundName, Note[]> = {
   hire: [
     { freq: 659, at: 0, length: 0.08, type: 'square', volume: 0.08 },
     { freq: 880, at: 0.08, length: 0.16, type: 'square', volume: 0.08 },
+  ],
+  stamp: [
+    { freq: 150, at: 0, length: 0.14, type: 'triangle', volume: 0.22, slide: 60 },
+    { freq: 1319, at: 0.05, length: 0.08, type: 'square', volume: 0.07 },
+    { freq: 1760, at: 0.11, length: 0.18, type: 'square', volume: 0.07 },
   ],
   research: [
     { freq: 440, at: 0, length: 0.06, type: 'square', volume: 0.07 },

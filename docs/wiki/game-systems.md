@@ -28,8 +28,21 @@ This page explains each rule system of the demo. Numbers are in `packages/game-c
 
 ## Game project
 
-- The player picks title, **genre**, **topic**, **size** (S, M, L), **platform**, **engine**, an optional sequel target, and the **focus** (six sliders that add up to 100).
-- Each week every employee adds work points to the six skills, weighted by the focus, morale and traits. Crunch gives ×1.25 output and ×1.5 bugs.
+- The player picks title, **genre**, **topic**, **size** (S, M, L), **platform**, **engine** and an optional sequel target. The **focus** comes from the phase decisions (see below).
+- A game project has three **phases**, played in order. Each phase has three **aspects**, and each aspect feeds one skill:
+
+  | Phase | Aspect (skill) |
+  | --- | --- |
+  | 1 Foundation | Code base (tech), Core loop (design), Plot (story) |
+  | 2 Content | Levels (design), Artwork (art), Music (sound) |
+  | 3 Finish | Bug hunt (polish), Visual effects (art), Audio mix (sound) |
+
+  The table is `PHASES` in `content.ts`.
+- The work weeks (project weeks minus the test week) are split over the phases as evenly as possible, earlier phases first: 3-2-2 for size S, 5-4-4 for M, 7-7-7 for L. The test week comes after phase 3.
+- A phase waits for the player at the start and each time the weeks of the previous phase are used up. The project has `phase` (0 to 2) and `awaitingPhase`. `isBlocked` is true while `awaitingPhase` is true, so `advanceWeek` does nothing. `setPhaseFocus(state, weights)` stores three weights (0-100, steps of 5 in the UI) and lets the project continue. A weight is relative: the **share** of an aspect is its weight divided by the total of the phase. All zero means equal shares.
+- Each week every employee adds work points only to the skills of the running phase, split by the aspect shares, and weighted by morale and traits. The output per week stays on the level of the old six-skill focus. Crunch gives ×1.25 output and ×1.5 bugs.
+- The **focus** that the market and the review hints read is computed from the phase weights: each phase counts one third, each aspect share goes to its skill. Phases that are not decided yet count with equal shares. `blendFocus` does this.
+- Reachability: tech, design and story from phase 1 add up to at most one third of the focus. `bestPhasePlan(genre)` searches all plans in steps of 5. The best plan reaches a focus fit of 0.98 or more for every genre (Racing 0.98, Adventure 0.98, RPG 0.99, the rest 1.0). To make this true the ideals of Adventure and RPG were lowered in tech and story. `idealPhaseWeights(genre)` gives the shares of the best plan. The UI shows them as a star on the phase sheet after the studio has released a game in that genre. The bot uses them.
 - The last week is the **test week**. It removes 50% of bugs (75% with the test lab).
 - **Quality** (1-100) comes from:
   - points per week compared with the **quality bar**, which rises 20% of its base every year
@@ -45,7 +58,28 @@ This page explains each rule system of the demo. Numbers are in `packages/game-c
 - The **hint** says what held the score back: bugs, an old engine, a bad combo, a weak skill or genre fatigue.
 - **Chart rank** compares the score with rival releases within 6 weeks.
 - **Sales** are planned at release and paid every week for 32 weeks with a falling curve. Sales depend on platform audience, score, size, fans, fan mood, hype, sequel status and rival releases in the same weeks. Units are capped at 15% of the audience.
-- **Fans gained** depend on units sold and the score.
+- **Unit scale.** `UNIT_SCALE` (20, in `balance.ts`) multiplies every copy count so that daily numbers feel big. `audience()` returns copies, not people: the platform table times 1000 times `UNIT_SCALE`. Player units, the rival estimate, the unit tiers (`UNIT_TIER_UNITS`) and the long seller floor (`LONG_SELLER_UNITS`) all use it. `Release.unitRevenue` is the studio's cut per copy and is divided by `UNIT_SCALE`, so revenue, cash and royalties do not change. Revenue of a release is units times `unitRevenue`.
+- **Fans gained** depend on units sold divided by `UNIT_SCALE`, and the score. Fan counts, hype and events stay on the old level.
+
+## Sales desk: days, regions and badges
+
+The week stays the step of the simulation. The code is in `packages/game-core/src/sales.ts`.
+
+- **Real units.** `paySales` stores the units that were really sold each week in `Release.soldWeeks` (the plan in `weeklySales` times the sales modifiers). `totalSales` is their sum.
+- **Days.** `dailySales(release, weekIndex)` splits one sold week into 7 **day** values that add up to the week exactly. The weights are a weekday shape (`WEEKDAY_SHAPE`, weekend higher), a slow fall inside the week (`SALES_DAY_DECAY`) and a jitter of 12% from a hash of the release id, the week and the day. It uses no random numbers from the seed. `salesView(release, weekIndex, daysShown)` gives what the sales desk shows: the day number, the units of the last shown day, total, revenue and the last 28 days.
+- **Reveal model.** `advanceWeek` finishes a week and knows its units at once. The UI then reveals that finished week day by day during the next timer interval: day 1 at once, days 2 to 7 in six steps of one seventh of the interval. Day 7 shows with a short hold before the next week. At that moment the total on the desk equals `totalSales`. A paused clock stops the reveal.
+- **Regions.** `REGIONS` in `content.ts` has six regions with a market share (USA 34%, Japan 20%, Germany 14%, United Kingdom 12%, France 10%, Brazil 10%), a taste weight per genre and a taste weight per topic tag. `regionalSales(release)` splits the units with these weights and a 10% jitter from the release id. The parts add up to the total. The result is the same every time.
+- **Rival units.** Rivals have no sales numbers. `rivalPlannedUnits(state, rivalRelease)` estimates them with the formula of the player: reach (the best platform audience of that year, times `RIVAL_REACH_SHARE`) times `SALES_RATE` times `(score / 5)^2` times `RIVAL_SIZE_MULT` times the fan bonus of the rival, with the same cap. `rivalWeeklyUnits` spreads them with the same sales curve (`salesCurve`). It is an estimate. It uses the current fans of the rival.
+- **Sales badges.** `awardBadges` runs every week after the rivals. A badge is `{ id, week, label }` in `Release.badges`. A release earns each badge once. Each badge adds a log line (tone good) and `BADGE_HYPE` (1) studio hype.
+
+  | Badge | Rule |
+  | --- | --- |
+  | New record | The units of this week beat the best week of every earlier game of the studio. Not for the first game. |
+  | Cult favorite, Big seller, Smash hit, Legend | Total units reach 800, 2,000, 4,500 or 7,000 times `UNIT_SCALE` times `marketScale(release week)`. `marketScale` is the audience of all platforms in the release year divided by that of 1980 (about 1 in 1980, about 12 in 1989). Only the highest reached tier is awarded. |
+  | Bestseller of the week | At least one rival release is on sale, and the units of this week are higher than the estimate of every one of them. |
+  | Best seller of the year so far | From week 10 of the year: the units sold this calendar year beat every rival release and every other own game. |
+  | Most loved in a region | At least one rival release is on sale, and in that region the game sells at least 1.5 times as much as the best rival. At most one new region badge a week, the one with the biggest margin. |
+  | Long seller | After 16 weeks on sale the weekly units are still 40 times `UNIT_SCALE` times `marketScale` or more. |
 
 ## Fans
 

@@ -10,7 +10,7 @@ const base = () => createNewGame({ studioName: 'Fan Club', founderName: 'Al', ar
 function release(score: number, extra: Partial<Release> = {}): Release {
   return {
     id: `rel-${score}`, title: `Game ${score}`, genre: 'arcade', topic: 'space', size: 'S', platform: 'vector64', week: 1, score,
-    reviews: [], weeklySales: [], totalSales: 0, revenue: 0, unitRevenue: 10, fansGained: 0, onSaleWeeks: 0, hint: null, chartRank: 1, ...extra,
+    reviews: [], weeklySales: [], soldWeeks: [], badges: [], totalSales: 0, revenue: 0, unitRevenue: 10, fansGained: 0, onSaleWeeks: 0, hint: null, chartRank: 1, ...extra,
   }
 }
 

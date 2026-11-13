@@ -1,9 +1,9 @@
 import { buyEngine, buyPlatform, buyResearch, canMove, moveOffice, researchAvailable } from './business'
-import { ENGINES, GENRES, PLATFORMS, RESEARCH } from './content'
+import { ENGINES, PLATFORMS, RESEARCH } from './content'
 import { advanceWeek, resolveEvent } from './game'
 import { audience } from './market'
 import { yearOf } from './calendar'
-import { availableEngines, availablePlatforms, availableSizes, comboBonus, engineTech, engineYear, startProject, unlockedGenres, unlockedTopics } from './project'
+import { availableEngines, availablePlatforms, availableSizes, comboBonus, engineTech, engineYear, idealPhaseWeights, setPhaseFocus, startProject, unlockedGenres, unlockedTopics } from './project'
 import { capacity, hire, monthlyCosts } from './staff'
 import { SIZES } from './balance'
 import type { EngineId, GameSize, GameState, Genre, PlatformId, ProjectPlan, ResearchId, Topic } from './types'
@@ -17,9 +17,14 @@ export function plan(overrides: Partial<ProjectPlan> = {}): ProjectPlan {
     size: 'S',
     platform: 'vector64',
     engine: 'tinker',
-    focus: { ...GENRES[genre].ideal },
     ...overrides,
   }
+}
+
+export function answerPhases(state: GameState): GameState {
+  let s = state
+  while (s.project?.awaitingPhase) s = setPhaseFocus(s, idealPhaseWeights(s.project.genre)[s.project.phase]!)
+  return s
 }
 
 export function runWeeks(state: GameState, weeks: number, autoChoice = true): GameState {
@@ -29,7 +34,7 @@ export function runWeeks(state: GameState, weeks: number, autoChoice = true): Ga
       const event = s.pendingEvents[0]!
       s = resolveEvent(s, event.choices[event.choices.length - 1]!.id)
     }
-    s = advanceWeek(s)
+    s = advanceWeek(answerPhases(s))
   }
   return s
 }
@@ -86,7 +91,7 @@ export function autoplay(state: GameState, weeks: number, smart = true): GameSta
     }
     s = manage(s, smart)
     if (!s.project && !s.activeContract) s = startProject(s, bestPlan(s, `Game ${s.releases.length + 1}`))
-    s = advanceWeek(s)
+    s = advanceWeek(answerPhases(s))
   }
   return s
 }

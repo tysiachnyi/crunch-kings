@@ -22,6 +22,8 @@ export const SIZES: Record<GameSize, { weeks: number; salesMult: number; quality
 }
 
 export const WORK_RATE = 1
+export const PHASE_WEIGHT_STEP = 5
+export const PHASE_WEIGHT_MAX = 100
 export const QUALITY_BAR_BASE = 10
 export const QUALITY_BAR_GROWTH = 0.2
 export const QUALITY_CURVE = 0.6
@@ -62,6 +64,7 @@ export const FAST_LEARNER_BONUS = 1.5
 export const SKILL_GAIN_PER_RELEASE = 0.3
 export const SKILL_CAP = 20
 
+export const UNIT_SCALE = 20
 export const SALES_RATE = 0.0024
 export const SALES_SCORE_POWER = 2
 export const SALES_AUDIENCE_CAP = 0.15
@@ -121,3 +124,18 @@ export const AWARD_FANS = 0.1
 export const NOMINATION_HYPE = 8
 export const JAM_HYPE = 10
 export const JAM_FANS = 150
+
+export const WEEKDAY_SHAPE = [0.8, 0.85, 0.9, 0.95, 1.1, 1.4, 1.5]
+export const DAY_JITTER = 0.12
+export const DAYS_PER_WEEK = 7
+export const SALES_DAY_DECAY = (1 - SALES_DECAY) ** (1 / DAYS_PER_WEEK)
+
+export const BADGE_HYPE = 1
+export const UNIT_TIER_UNITS = [800, 2000, 4500, 7000].map((u) => u * UNIT_SCALE)
+export const LONG_SELLER_WEEKS = 16
+export const LONG_SELLER_UNITS = 40 * UNIT_SCALE
+export const YEAR_BEST_MIN_WEEK = 10
+export const RIVAL_SIZE_MULT = 2.4
+export const RIVAL_REACH_SHARE = 0.7
+export const REGION_JITTER = 0.1
+export const REGION_WIN_MARGIN = 1.5

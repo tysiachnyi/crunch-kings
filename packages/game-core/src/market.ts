@@ -24,6 +24,7 @@ import {
   SIZES,
   SKILL_CAP,
   SKILL_GAIN_PER_RELEASE,
+  UNIT_SCALE,
 } from './balance'
 import { yearOf } from './calendar'
 import { ENGINES, GENRES, OUTLETS, PLATFORMS, REVIEW_QUOTES, RIVAL_NAME_PARTS, RIVAL_SEEDS, RIVAL_TITLE_PARTS, SKILLS, TOPICS } from './content'
@@ -37,7 +38,7 @@ import { clamp, fill, inflation, log, round1 } from './util'
 export function audience(platform: keyof typeof PLATFORMS, week: number): number {
   const table = PLATFORMS[platform].audience
   const index = clamp(yearOf(week) - 1980, 0, table.length - 1)
-  return (table[index] ?? 0) * 1000
+  return (table[index] ?? 0) * 1000 * UNIT_SCALE
 }
 
 function reviewFor(state: GameState, project: GameProject, aspect: (typeof OUTLETS)[number]['aspect'], base: number, rng: Rng): number {
@@ -86,7 +87,7 @@ function clashMultiplier(state: GameState, genre: Genre): number {
   return Math.max(0.5, mult)
 }
 
-function salesCurve(total: number): number[] {
+export function salesCurve(total: number): number[] {
   const raw = Array.from({ length: SALES_TAIL_WEEKS }, (_, i) => (1 - SALES_DECAY) ** i)
   const sum = raw.reduce((a, b) => a + b, 0)
   return raw.map((r) => Math.round((total * r) / sum))
@@ -117,8 +118,8 @@ export function releaseGame(state: GameState, project: GameProject, rng: Rng): G
   )
   const royalty = project.engine === 'own' ? 0 : ENGINES[project.engine].royalty
   const price = SIZES[project.size].price * inflation(state.week)
-  const unitRevenue = Math.max(1, price * (1 - royalty) - platform.unitCost)
-  const fansGained = Math.round(units * (score / 10) ** 2 * FANS_PER_COPY)
+  const unitRevenue = Math.max(1, price * (1 - royalty) - platform.unitCost) / UNIT_SCALE
+  const fansGained = Math.round((units / UNIT_SCALE) * (score / 10) ** 2 * FANS_PER_COPY)
   const id = `rel-${state.nextId}`
   const release: Release = {
     id,
@@ -131,6 +132,8 @@ export function releaseGame(state: GameState, project: GameProject, rng: Rng): G
     score,
     reviews,
     weeklySales: salesCurve(units),
+    soldWeeks: [],
+    badges: [],
     totalSales: 0,
     revenue: 0,
     unitRevenue,
@@ -175,7 +178,7 @@ export function paySales(state: GameState): GameState {
     const units = Math.round((r.weeklySales[r.onSaleWeeks] ?? 0) * salesMod)
     const revenue = units * r.unitRevenue
     income += revenue
-    return { ...r, onSaleWeeks: r.onSaleWeeks + 1, totalSales: r.totalSales + units, revenue: r.revenue + revenue }
+    return { ...r, onSaleWeeks: r.onSaleWeeks + 1, soldWeeks: [...r.soldWeeks, units], totalSales: r.totalSales + units, revenue: r.revenue + revenue }
   })
   return { ...state, releases, money: state.money + Math.round(income) }
 }

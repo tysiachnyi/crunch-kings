@@ -7,7 +7,7 @@ import { OfficePostFx } from './OfficePostFx'
 import { DEFAULT_PEOPLE, Stage } from './Stage'
 import type { OfficeLevel, ScenePerson } from './Stage'
 
-export const BACKDROP_COLOR = '#1C1A26'
+export const BACKDROP_COLOR = '#141925'
 
 const VIEW_WIDTH: Record<OfficeLevel, number> = { garage: 8.4, smallOffice: 10.4 }
 
