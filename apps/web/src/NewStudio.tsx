@@ -21,21 +21,24 @@ export function NewStudio({ onFound, onBack }: NewStudioProps) {
 
   return (
     <form
-      className="card setup"
+      className="cover setup"
       onSubmit={(event) => {
         event.preventDefault()
         onFound({ studioName: studioName.trim() || 'Garage Legends', founderName, archetype })
       }}
     >
-      <h1>Crunch Kings</h1>
+      <p className="kicker">New studio</p>
+      <h1 className="logo compact">
+        Crunch <span>Kings</span>
+      </h1>
       <p className="tagline">January 1980. A garage, a used computer and {money(START_MONEY)} from selling your car.</p>
       <label>
         Studio name
-        <input value={studioName} onChange={(e) => setStudioName(e.target.value)} maxLength={32} />
+        <input type="text" value={studioName} onChange={(e) => setStudioName(e.target.value)} maxLength={32} />
       </label>
       <label>
         Your name
-        <input value={founderName} onChange={(e) => setFounderName(e.target.value)} placeholder="You" maxLength={24} />
+        <input type="text" value={founderName} onChange={(e) => setFounderName(e.target.value)} placeholder="You" maxLength={24} />
       </label>
       <fieldset>
         <legend>You are a...</legend>

@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import {
   ENGINES,
   GENRES,
+  PHASES,
   PLATFORMS,
   SIZES,
   SKILLS,
@@ -9,7 +10,8 @@ import {
   availableSizes,
   comboLabel,
   engineTech,
-  normalizeFocus,
+  phaseLengths,
+  phaseShares,
   projectQuality,
   runCampaign,
   setCrunch,
@@ -19,7 +21,7 @@ import {
   writeDevDiary,
   yearOf,
 } from '@crunch-kings/game-core'
-import type { EngineId, Focus, GameSize, GameState, Genre, PlatformId, Skill, Topic } from '@crunch-kings/game-core'
+import type { EngineId, GameProject, GameSize, GameState, Genre, PlatformId, Skill, Topic } from '@crunch-kings/game-core'
 import { money } from '../format'
 
 type Act = (change: (state: GameState) => GameState, sound?: 'click' | 'coin' | 'research' | 'hire') => void
@@ -32,29 +34,78 @@ export function ProjectPanel({ game, act }: { game: GameState; act: Act }) {
     const c = game.activeContract
     return (
       <div className="panel-body">
-        <h2>Contract: {c.client}</h2>
+        <p className="kicker">Contract</p>
+        <h2>{c.client}</h2>
         <p className="muted">{c.task}</p>
         <Meter label={`${SKILL_LABEL[c.skill]} work`} value={c.progress} max={c.required} />
-        <p>
-          Pays <b>{money(c.pay)}</b> · {c.weeksLeft} weeks left · penalty {money(c.penalty)}
-        </p>
+        <dl className="facts">
+          <div>
+            <dt>Pays</dt>
+            <dd>{money(c.pay)}</dd>
+          </div>
+          <div>
+            <dt>Weeks left</dt>
+            <dd>{c.weeksLeft}</dd>
+          </div>
+          <div>
+            <dt>Penalty</dt>
+            <dd>{money(c.penalty)}</dd>
+          </div>
+        </dl>
       </div>
     )
   }
   return <NewGameForm game={game} act={act} />
 }
 
-function Meter({ label, value, max, tone }: { label: string; value: number; max: number; tone?: string }) {
+function Meter({ label, value, max, tone, unit = '' }: { label: string; value: number; max: number; tone?: string; unit?: string }) {
   const pct = Math.max(0, Math.min(100, (value / Math.max(1, max)) * 100))
   return (
     <div className="meter">
       <div className="meter-label">
         <span>{label}</span>
-        <span>{Math.round(value)}</span>
+        <span>
+          {Math.round(value)}
+          {unit}
+        </span>
       </div>
       <div className="meter-track">
         <div className={`meter-fill ${tone ?? ''}`} style={{ width: `${pct}%` }} />
       </div>
+    </div>
+  )
+}
+
+function PhaseBar({ project }: { project: GameProject }) {
+  const lengths = phaseLengths(project.totalWeeks)
+  const testing = project.weeksLeft <= 1
+  const shares = phaseShares(project.phaseWeights[project.phase]!)
+  const running = !project.awaitingPhase && !testing
+  return (
+    <div className="phase-bar">
+      <p className="phase-title">
+        Phase {project.phase + 1} of {PHASES.length} - {PHASES[project.phase]!.label}
+      </p>
+      <div className="phase-track" role="img" aria-label={`Phase ${project.phase + 1} of ${PHASES.length}`}>
+        {PHASES.map((phase, i) => {
+          const fill = i < project.phase ? 1 : i > project.phase ? 0 : project.awaitingPhase ? 0 : (lengths[i]! - project.phaseWeeksLeft) / lengths[i]!
+          return (
+            <div key={phase.label} className={`phase-seg ${i === project.phase ? 'current' : ''}`}>
+              <div className="phase-fill" style={{ width: `${Math.min(1, fill + (testing && i === PHASES.length - 1 ? 1 : 0)) * 100}%` }} />
+              <span>{phase.label}</span>
+            </div>
+          )
+        })}
+      </div>
+      {running ? (
+        <div className="points three">
+          {PHASES[project.phase]!.aspects.map((aspect, i) => (
+            <Meter key={aspect.label} label={aspect.label} value={shares[i]! * 100} max={100} tone="soft" unit="%" />
+          ))}
+        </div>
+      ) : (
+        <p className="small muted">{testing ? 'The team tests the game and removes bugs.' : 'Waiting for your decision.'}</p>
+      )}
     </div>
   )
 }
@@ -66,26 +117,35 @@ function ProjectProgress({ game, act }: { game: GameState; act: Act }) {
   const predicted = game.research.includes('playtests') && done > 1 ? projectQuality(game, p, false).quality / 10 : null
   return (
     <div className="panel-body">
+      <p className="kicker">In development</p>
       <h2>{p.title}</h2>
       <p className="muted">
         {GENRES[p.genre].label} · {TOPICS[p.topic].label} · size {p.size} · {PLATFORMS[p.platform].label}
         {p.sequelOf ? ' · sequel' : ''}
       </p>
+      <PhaseBar project={p} />
       <Meter label={p.weeksLeft <= 1 ? 'Testing week' : `Week ${done} of ${p.totalWeeks}`} value={done} max={p.totalWeeks} />
       <div className="points">
         {SKILLS.map((s) => (
           <Meter key={s} label={SKILL_LABEL[s]} value={p.points[s]} max={maxPoints} tone="soft" />
         ))}
       </div>
-      <p>
-        Bugs <b className={p.bugs > 10 ? 'bad' : undefined}>{Math.round(p.bugs)}</b> · Hype <b>{Math.round(p.hype + game.hype)}</b>
+      <dl className="facts">
+        <div>
+          <dt>Bugs</dt>
+          <dd className={p.bugs > 10 ? 'bad' : undefined}>{Math.round(p.bugs)}</dd>
+        </div>
+        <div>
+          <dt>Hype</dt>
+          <dd>{Math.round(p.hype + game.hype)}</dd>
+        </div>
         {predicted !== null && (
-          <>
-            {' '}
-            · Playtest guess <b>{predicted.toFixed(1)}</b>
-          </>
+          <div>
+            <dt>Playtest guess</dt>
+            <dd>{predicted.toFixed(1)}</dd>
+          </div>
         )}
-      </p>
+      </dl>
       <div className="row">
         <button className={p.crunch ? 'danger' : 'secondary'} onClick={() => act((s) => setCrunch(s, !p.crunch))} title="Output x1.25, more bugs, stress +10 a week">
           {p.crunch ? 'Stop crunch' : 'Crunch'}
@@ -106,35 +166,6 @@ function ProjectProgress({ game, act }: { game: GameState; act: Act }) {
   )
 }
 
-function FocusSliders({ focus, onChange, ideal }: { focus: Focus; onChange: (f: Focus) => void; ideal: Focus | null }) {
-  const total = SKILLS.reduce((sum, s) => sum + focus[s], 0)
-  return (
-    <div className="sliders">
-      <div className="slider-head">
-        <span>Focus</span>
-        <span className={total === 100 ? 'muted' : 'bad'}>{total}/100</span>
-      </div>
-      {SKILLS.map((s) => (
-        <label key={s} className="slider">
-          <span>{SKILL_LABEL[s]}</span>
-          <input type="range" min={0} max={60} step={5} value={focus[s]} onChange={(e) => onChange({ ...focus, [s]: Number(e.target.value) })} />
-          <span className="slider-value">
-            {focus[s]}
-            {ideal && <i title="What worked last time"> ★{ideal[s]}</i>}
-          </span>
-        </label>
-      ))}
-      {total !== 100 && (
-        <button type="button" className="link" onClick={() => onChange(normalizeFocus(focus))}>
-          Balance to 100
-        </button>
-      )}
-    </div>
-  )
-}
-
-const START_FOCUS: Focus = { design: 25, tech: 25, art: 20, sound: 10, story: 5, polish: 15 }
-
 function NewGameForm({ game, act }: { game: GameState; act: Act }) {
   const genres = unlockedGenres(game.week)
   const topics = unlockedTopics(game.week)
@@ -145,10 +176,7 @@ function NewGameForm({ game, act }: { game: GameState; act: Act }) {
   const [size, setSize] = useState<GameSize>('S')
   const [platform, setPlatform] = useState<PlatformId>(game.platforms[game.platforms.length - 1] ?? 'vector64')
   const [engine, setEngine] = useState<EngineId>(game.engines[game.engines.length - 1] ?? 'tinker')
-  const [focus, setFocus] = useState<Focus>(START_FOCUS)
   const [sequelOf, setSequelOf] = useState('')
-  const known = useMemo(() => new Set(game.releases.map((r) => r.genre)), [game.releases])
-  const ideal = known.has(genre) ? GENRES[genre].ideal : null
   const combo = game.research.includes('marketResearch') ? comboLabel(genre, topic) : null
   const sequelOptions = game.releases.filter((r) => r.score >= 6)
 
@@ -158,14 +186,15 @@ function NewGameForm({ game, act }: { game: GameState; act: Act }) {
       onSubmit={(event) => {
         event.preventDefault()
         const finalTitle = title.trim() || `${TOPICS[topic].label} ${GENRES[genre].label}`
-        act((s) => startProject(s, { title: finalTitle, genre, topic, size, platform, engine, focus: normalizeFocus(focus), ...(sequelOf ? { sequelOf } : {}) }))
+        act((s) => startProject(s, { title: finalTitle, genre, topic, size, platform, engine, ...(sequelOf ? { sequelOf } : {}) }))
         setTitle('')
       }}
     >
+      <p className="kicker">Project</p>
       <h2>New game</h2>
       <label>
         Title
-        <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={40} placeholder={`${TOPICS[topic].label} ${GENRES[genre].label}`} />
+        <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={40} placeholder={`${TOPICS[topic].label} ${GENRES[genre].label}`} />
       </label>
       <div className="grid2">
         <label>
@@ -234,7 +263,6 @@ function NewGameForm({ game, act }: { game: GameState; act: Act }) {
       </div>
       {combo && <p className={`combo ${combo}`}>Market research: {combo === 'great' ? 'a great match!' : combo === 'good' ? 'a decent match.' : 'these do not mix.'}</p>}
       {engine !== 'own' && yearOf(game.week) - ENGINES[engine].year >= 4 && <p className="bad small">This engine is {yearOf(game.week) - ENGINES[engine].year} years old. Critics will notice.</p>}
-      <FocusSliders focus={focus} onChange={setFocus} ideal={ideal} />
       <button type="submit">Start development</button>
     </form>
   )

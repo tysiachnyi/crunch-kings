@@ -36,3 +36,9 @@ export function createRng(seed: number): Rng {
   }
   return rng
 }
+
+export function hashUnit(key: string): number {
+  let h = 0x811c9dc5
+  for (let i = 0; i < key.length; i++) h = Math.imul(h ^ key.charCodeAt(i), 0x01000193)
+  return nextRandom(h | 0)[0]
+}

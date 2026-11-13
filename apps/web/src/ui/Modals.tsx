@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react'
-import { GENRES, PLATFORMS, TOPICS, dateLabel } from '@crunch-kings/game-core'
-import type { GameState, PendingEvent } from '@crunch-kings/game-core'
-import { count, money } from '../format'
+import { GENRES, PHASES, PHASE_WEIGHT_MAX, PHASE_WEIGHT_STEP, PLATFORMS, SKILLS, TOPICS, dateLabel, idealPhaseWeights, phasePoints, phaseShares } from '@crunch-kings/game-core'
+import type { GameState, PendingEvent, PhaseWeights } from '@crunch-kings/game-core'
+import { count, money, score } from '../format'
 import { play } from '../sound'
+import { Badges, RegionBars } from './SalesDesk'
 
 export function EventModal({ event, onChoose }: { event: PendingEvent; onChoose: (id: string) => void }) {
   return (
     <div className="overlay">
       <div className="modal card-pop">
+        <p className="kicker">News for the studio</p>
         <h2>{event.title}</h2>
         <p className="event-text">{event.text}</p>
         <div className="choices">
@@ -22,6 +24,87 @@ export function EventModal({ event, onChoose }: { event: PendingEvent; onChoose:
   )
 }
 
+const SKILL_LABEL = { design: 'Design', tech: 'Tech', art: 'Art', sound: 'Sound', story: 'Story', polish: 'Polish' } as const
+
+export function PhaseSheet({ game, onDecide }: { game: GameState; onDecide: (weights: PhaseWeights) => void }) {
+  const project = game.project!
+  const phase = PHASES[project.phase]!
+  const last = project.phase === PHASES.length - 1
+  const [weights, setWeights] = useState<PhaseWeights>([20, 20, 20])
+  useEffect(() => setWeights([20, 20, 20]), [project.phase, project.title])
+  const shares = phaseShares(weights)
+  const known = game.releases.some((r) => r.genre === project.genre)
+  const ideal = known ? idealPhaseWeights(project.genre)[project.phase]! : null
+  const gained = phasePoints(project)
+  const ended = project.phase > 0 ? PHASES[project.phase - 1]!.label : null
+  return (
+    <div className="overlay">
+      <form
+        className="modal phase card-pop"
+        onSubmit={(event) => {
+          event.preventDefault()
+          onDecide(weights)
+        }}
+      >
+        <p className="kicker">
+          Phase {project.phase + 1} of {PHASES.length}
+        </p>
+        <h2>{phase.label}</h2>
+        <p className="muted">
+          {project.title} · {GENRES[project.genre].label} · {TOPICS[project.topic].label}
+        </p>
+        <p className="small">{phase.text}</p>
+        {ended && (
+          <div className="report">
+            <p className="report-head">Report: {ended}</p>
+            <dl className="facts">
+              {SKILLS.filter((s) => gained[s] >= 0.5).map((s) => (
+                <div key={s}>
+                  <dt>{SKILL_LABEL[s]}</dt>
+                  <dd>+{Math.round(gained[s])}</dd>
+                </div>
+              ))}
+              <div>
+                <dt>Bugs</dt>
+                <dd className={project.bugs > 10 ? 'bad' : undefined}>{Math.round(project.bugs)}</dd>
+              </div>
+            </dl>
+          </div>
+        )}
+        <div className="sliders wide">
+          <div className="slider-head">
+            <span>Where the team works</span>
+            <span className="muted">Share</span>
+          </div>
+          {phase.aspects.map((aspect, i) => (
+            <div key={aspect.label} className="aspect">
+              <label className="slider">
+                <span>{aspect.label}</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={PHASE_WEIGHT_MAX}
+                  step={PHASE_WEIGHT_STEP}
+                  value={weights[i]}
+                  onChange={(e) => setWeights(weights.map((w, j) => (j === i ? Number(e.target.value) : w)) as PhaseWeights)}
+                />
+                <span className="slider-value">
+                  {Math.round(shares[i]! * 100)}%
+                  {ideal && <i title="What worked last time"> ★{ideal[i]}%</i>}
+                </span>
+              </label>
+              <p className="small muted">
+                {aspect.text} Feeds {SKILL_LABEL[aspect.skill].toLowerCase()}.
+              </p>
+            </div>
+          ))}
+        </div>
+        <button type="submit">{last ? 'Start the last phase' : 'Start phase'}</button>
+      </form>
+    </div>
+  )
+}
+
 function SalesChart({ weekly }: { weekly: number[] }) {
   const max = Math.max(...weekly, 1)
   const w = 280
@@ -29,8 +112,14 @@ function SalesChart({ weekly }: { weekly: number[] }) {
   const points = weekly.map((v, i) => `${(i / (weekly.length - 1)) * w},${h - (v / max) * h}`).join(' ')
   return (
     <svg className="sales-chart" viewBox={`0 0 ${w} ${h + 4}`} role="img" aria-label="Expected weekly sales">
+      <defs>
+        <pattern id="hatch" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+          <line className="hatch-line" x1="0" y1="0" x2="0" y2="5" />
+        </pattern>
+      </defs>
       <polyline points={`0,${h} ${points} ${w},${h}`} className="area" />
       <polyline points={points} className="line" />
+      <line className="base" x1="0" y1={h + 0.5} x2={w} y2={h + 0.5} />
     </svg>
   )
 }
@@ -59,7 +148,7 @@ export function ReleaseDay({ game, releaseId, onClose }: { game: GameState; rele
   return (
     <div className="overlay">
       <div className="modal release card-pop">
-        <p className="muted small">
+        <p className="kicker">
           Release day · {dateLabel(release.week)} · {PLATFORMS[release.platform].label}
         </p>
         <h2>{release.title}</h2>
@@ -78,16 +167,19 @@ export function ReleaseDay({ game, releaseId, onClose }: { game: GameState; rele
                   </div>
                 </>
               ) : (
-                <div className="envelope">✉</div>
+                <div className="envelope">Sealed</div>
               )}
             </div>
           ))}
         </div>
         {all && (
           <div className="release-summary">
-            <div className="big-score">{release.score}</div>
+            <div className="big-score">
+              {score(release.score)}
+              <small>of 10</small>
+            </div>
             <div>
-              {release.hint && <p className="small">💡 {release.hint}</p>}
+              {release.hint && <p className="hint">{release.hint}</p>}
               <p className="small">
                 Chart rank <b>#{release.chartRank}</b> · fans +{count(release.fansGained)} · expected copies about {count(planned)}
               </p>
@@ -98,14 +190,18 @@ export function ReleaseDay({ game, releaseId, onClose }: { game: GameState; rele
                 </p>
               )}
               {!isNew && (
-                <p className="small">
-                  Sold so far: {count(release.totalSales)} · {money(release.revenue)}
-                </p>
+                <>
+                  <p className="small">
+                    Sold so far: {count(release.totalSales)} · {money(release.revenue)}
+                  </p>
+                  <Badges badges={release.badges} />
+                  {release.totalSales > 0 && <RegionBars release={release} />}
+                </>
               )}
             </div>
           </div>
         )}
-        <button onClick={onClose} disabled={!all} autoFocus>
+        <button onClick={onClose} disabled={!all} autoFocus={all} key={all ? "done" : "wait"}>
           {all ? 'Back to work' : 'Opening the mail…'}
         </button>
       </div>
@@ -122,7 +218,7 @@ export function EndingScreen({ game, onRestart }: { game: GameState; onRestart: 
   return (
     <div className="overlay ending">
       <div className="modal card-pop">
-        <p className="muted small">{bankrupt ? 'The end' : 'End of the demo'}</p>
+        <p className="kicker">{bankrupt ? 'The end' : 'End of the demo'}</p>
         <h1>{bankrupt ? `${game.studioName} closes` : `${game.studioName}: the garage years`}</h1>
         <p>
           {bankrupt
@@ -153,7 +249,7 @@ export function EndingScreen({ game, onRestart }: { game: GameState; onRestart: 
         </div>
         {best && (
           <p>
-            Best game: <b>{best.title}</b> ({best.score}/10).
+            Best game: <b>{best.title}</b> ({score(best.score)}/10).
           </p>
         )}
         {pal && <p className="muted">{pal.name} keeps a photo of the first day on the wall.</p>}

@@ -11,6 +11,8 @@ import {
   DEV_DIARY_MOOD,
   ENGINE_AGE_PENALTY,
   GENRE_FATIGUE_PENALTY,
+  PHASE_WEIGHT_MAX,
+  PHASE_WEIGHT_STEP,
   PRESS_KIT_HYPE,
   QUALITY_BAR_BASE,
   QUALITY_BAR_GROWTH,
@@ -22,10 +24,10 @@ import {
   WORK_RATE,
 } from './balance'
 import { yearOf } from './calendar'
-import { ENGINES, GENRES, OWN_ENGINE_TECH, PLATFORMS, SKILLS, TOPICS } from './content'
+import { ENGINES, GENRES, OWN_ENGINE_TECH, PHASES, PLATFORMS, SKILLS, TOPICS } from './content'
 import type { Rng } from './rng'
 import { effectiveSkill } from './staff'
-import type { EngineId, Focus, GameProject, GameSize, GameState, Genre, PlatformId, ProjectPlan, Skill, Topic } from './types'
+import type { EngineId, Focus, GameProject, GameSize, GameState, Genre, PhaseWeights, PlatformId, ProjectPlan, Skill, Topic } from './types'
 import { clamp, inflation, log, money } from './util'
 
 export function unlockedGenres(week: number): Genre[] {
@@ -87,6 +89,100 @@ export function normalizeFocus(focus: Focus): Focus {
   return out
 }
 
+const EQUAL_WEIGHTS: PhaseWeights = [1, 1, 1]
+
+function emptyFocus(): Focus {
+  return { design: 0, tech: 0, art: 0, sound: 0, story: 0, polish: 0 }
+}
+
+export function phaseLengths(totalWeeks: number): number[] {
+  const work = totalWeeks - 1
+  const base = Math.floor(work / PHASES.length)
+  const extra = work - base * PHASES.length
+  return PHASES.map((_, i) => base + (i < extra ? 1 : 0))
+}
+
+export function phaseShares(weights: PhaseWeights): PhaseWeights {
+  const total = weights.reduce((sum, w) => sum + Math.max(0, w), 0)
+  if (total <= 0) return [1 / 3, 1 / 3, 1 / 3]
+  return weights.map((w) => Math.max(0, w) / total) as PhaseWeights
+}
+
+export function blendFocus(weights: PhaseWeights[]): Focus {
+  const out = emptyFocus()
+  PHASES.forEach((phase, p) => {
+    const shares = phaseShares(weights[p] ?? EQUAL_WEIGHTS)
+    phase.aspects.forEach((aspect, i) => {
+      out[aspect.skill] += (100 * shares[i]!) / PHASES.length
+    })
+  })
+  return out
+}
+
+export function phasePoints(project: GameProject): Focus {
+  const out = emptyFocus()
+  for (const s of SKILLS) out[s] = Math.max(0, project.points[s] - project.phaseStart[s])
+  return out
+}
+
+function planTriples(step: number): PhaseWeights[] {
+  const out: PhaseWeights[] = []
+  for (let a = 0; a <= 100; a += step) for (let b = 0; a + b <= 100; b += step) if ((100 - a - b) % step === 0) out.push([a, b, 100 - a - b])
+  return out
+}
+
+/**
+ * Finds the phase plan whose blended focus is closest to the ideal focus of a genre.
+ * It tries every plan where each phase has weights in the given step that add up to 100.
+ * A tiny penalty for uneven weights decides ties, so the result is stable and easy to read.
+ */
+export function bestPhasePlan(genre: Genre, step = PHASE_WEIGHT_STEP): PhaseWeights[] {
+  const ideal = GENRES[genre].ideal
+  const triples = planTriples(step)
+  const contribution = PHASES.map((phase) =>
+    triples.map((t) => {
+      const v = new Float64Array(SKILLS.length)
+      phase.aspects.forEach((aspect, i) => {
+        v[SKILLS.indexOf(aspect.skill)]! += (t[i]! / PHASES.length)
+      })
+      return v
+    }),
+  )
+  const target = Float64Array.from(SKILLS.map((s) => ideal[s]))
+  const uneven = triples.map((t) => t.reduce((sum, w) => sum + (w / 100 - 1 / 3) ** 2, 0) * 1e-4)
+  const n = SKILLS.length
+  let best = Infinity
+  let pick: [number, number, number] = [0, 0, 0]
+  const partial = new Float64Array(n)
+  for (let i = 0; i < triples.length; i++) {
+    for (let j = 0; j < triples.length; j++) {
+      for (let s = 0; s < n; s++) partial[s] = contribution[0]![i]![s]! + contribution[1]![j]![s]! - target[s]!
+      const base = uneven[i]! + uneven[j]!
+      for (let k = 0; k < triples.length; k++) {
+        const c = contribution[2]![k]!
+        let diff = base + uneven[k]!
+        for (let s = 0; s < n; s++) diff += Math.abs(partial[s]! + c[s]!)
+        if (diff < best) {
+          best = diff
+          pick = [i, j, k]
+        }
+      }
+    }
+  }
+  return pick.map((index) => triples[index]!)
+}
+
+const idealPlans = new Map<Genre, PhaseWeights[]>()
+
+export function idealPhaseWeights(genre: Genre): PhaseWeights[] {
+  let plan = idealPlans.get(genre)
+  if (!plan) {
+    plan = bestPhasePlan(genre)
+    idealPlans.set(genre, plan)
+  }
+  return plan.map((w) => [...w] as PhaseWeights)
+}
+
 function qualityBar(week: number): number {
   return QUALITY_BAR_BASE * (1 + QUALITY_BAR_GROWTH * (yearOf(week) - 1980))
 }
@@ -143,7 +239,12 @@ export function startProject(state: GameState, plan: ProjectPlan): GameState {
   const hype = state.research.includes('pressKit') ? PRESS_KIT_HYPE : 0
   const project: GameProject = {
     ...plan,
-    focus: normalizeFocus(plan.focus),
+    focus: blendFocus([EQUAL_WEIGHTS, EQUAL_WEIGHTS, EQUAL_WEIGHTS]),
+    phase: 0,
+    awaitingPhase: true,
+    phaseWeeksLeft: phaseLengths(weeks)[0]!,
+    phaseWeights: [[...EQUAL_WEIGHTS], [...EQUAL_WEIGHTS], [...EQUAL_WEIGHTS]],
+    phaseStart: emptyFocus(),
     totalWeeks: weeks,
     weeksLeft: weeks,
     points: { design: 0, tech: 0, art: 0, sound: 0, story: 0, polish: 0 },
@@ -162,6 +263,8 @@ export function workOnProject(state: GameState, project: GameProject, rng: Rng):
     return { ...project, bugs: Math.round(project.bugs * (1 - removal)), weeksLeft: 0, testing: true }
   }
   const points = { ...project.points }
+  const shares = phaseShares(project.phaseWeights[project.phase] ?? EQUAL_WEIGHTS)
+  const aspects = PHASES[project.phase]!.aspects
   let bugs = project.bugs
   for (const e of state.staff) {
     if (e.burnoutWeeks > 0) continue
@@ -169,19 +272,34 @@ export function workOnProject(state: GameState, project: GameProject, rng: Rng):
     if (e.traits.includes('perfectionist')) mult *= 0.9
     if (project.crunch) mult *= CRUNCH_OUTPUT * (e.traits.includes('nightOwl') ? 1.1 : 1)
     let output = 0
-    for (const s of SKILLS) {
-      let gain = (effectiveSkill(e, s) * project.focus[s] * mult) / 100
+    aspects.forEach((aspect, i) => {
+      const s = aspect.skill
+      let gain = effectiveSkill(e, s) * shares[i]! * mult
       if (s === 'sound' && state.research.includes('soundStudio')) gain *= 1.2
       if (s === 'polish' && state.research.includes('playtests')) gain *= 1.1
       points[s] += gain
       output += gain
-    }
+    })
     let bugRate = BUG_RATE * (1 - project.focus.polish / 200)
     if (project.crunch) bugRate *= CRUNCH_BUGS
     if (e.traits.includes('perfectionist')) bugRate *= 0.7
     bugs += output * bugRate
   }
-  return { ...project, points, bugs: Math.round(bugs * 10) / 10, weeksLeft: project.weeksLeft - 1 }
+  const phaseWeeksLeft = project.phaseWeeksLeft - 1
+  const next = { ...project, points, bugs: Math.round(bugs * 10) / 10, weeksLeft: project.weeksLeft - 1, phaseWeeksLeft }
+  if (phaseWeeksLeft > 0 || project.phase >= PHASES.length - 1) return next
+  const phase = project.phase + 1
+  return { ...next, phase, awaitingPhase: true, phaseWeeksLeft: phaseLengths(project.totalWeeks)[phase]! }
+}
+
+export function setPhaseFocus(state: GameState, weights: PhaseWeights): GameState {
+  const project = state.project
+  if (!project || !project.awaitingPhase) throw new Error('No phase waits for a decision.')
+  if (weights.length !== 3 || weights.some((w) => !Number.isFinite(w))) throw new Error('A phase needs three weights.')
+  const clean = weights.map((w) => clamp(Math.round(w), 0, PHASE_WEIGHT_MAX)) as PhaseWeights
+  const phaseWeights = project.phaseWeights.map((w, i) => (i === project.phase ? clean : w))
+  const next: GameProject = { ...project, phaseWeights, focus: blendFocus(phaseWeights), awaitingPhase: false, phaseStart: { ...project.points } }
+  return log({ ...state, project: next }, `"${project.title}": phase ${project.phase + 1} of ${PHASES.length}, ${PHASES[project.phase]!.label}, starts.`)
 }
 
 export function setCrunch(state: GameState, crunch: boolean): GameState {
@@ -203,8 +321,13 @@ export function writeDevDiary(state: GameState): GameState {
   if (!state.project) throw new Error('No game to write about.')
   const share = 1 / Math.max(1, state.staff.length)
   const points = {} as Record<Skill, number>
-  for (const s of SKILLS) points[s] = state.project.points[s] * (1 - share / state.project.totalWeeks)
-  const project = { ...state.project, points, hype: Math.min(100, state.project.hype + DEV_DIARY_HYPE) }
+  const phaseStart = {} as Record<Skill, number>
+  const keep = 1 - share / state.project.totalWeeks
+  for (const s of SKILLS) {
+    points[s] = state.project.points[s] * keep
+    phaseStart[s] = state.project.phaseStart[s] * keep
+  }
+  const project = { ...state.project, points, phaseStart, hype: Math.min(100, state.project.hype + DEV_DIARY_HYPE) }
   const fandom = { ...state.fandom, mood: clamp(state.fandom.mood + DEV_DIARY_MOOD, 0, 100) }
   return log({ ...state, project, fandom }, `Dev diary #${state.releases.length + 1} goes out. Fans feel heard. Mood +${DEV_DIARY_MOOD}.`, 'fan')
 }

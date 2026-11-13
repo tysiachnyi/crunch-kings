@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Badges, RegionBars } from './SalesDesk'
 import {
   ENGINES,
   GENRES,
@@ -21,7 +22,6 @@ import {
   fire,
   hire,
   monthlyCosts,
-  moodFace,
   moveOffice,
   researchAvailable,
   takeContract,
@@ -30,7 +30,8 @@ import {
   yearOf,
 } from '@crunch-kings/game-core'
 import type { Candidate, Employee, GameState, ResearchId, Skill } from '@crunch-kings/game-core'
-import { count, money } from '../format'
+import { count, money, score } from '../format'
+import { MoodFace } from './Icons'
 
 type Act = (change: (state: GameState) => GameState, sound?: 'click' | 'coin' | 'research' | 'hire') => void
 
@@ -40,11 +41,28 @@ function SkillRow({ person }: { person: Pick<Employee, 'skills'> }) {
   return (
     <div className="skills">
       {SKILLS.map((s) => (
-        <span key={s} title={s}>
+        <div key={s} className="skill" title={s}>
           <i>{SKILL_SHORT[s]}</i>
-          {person.skills[s].toFixed(person.skills[s] % 1 ? 1 : 0)}
-        </span>
+          <b>{person.skills[s].toFixed(person.skills[s] % 1 ? 1 : 0)}</b>
+          <span className="skill-bar">
+            <span style={{ width: `${Math.min(100, person.skills[s] * 10)}%` }} />
+          </span>
+        </div>
       ))}
+    </div>
+  )
+}
+
+function Gauge({ label, value, tone }: { label: string; value: number; tone?: string }) {
+  return (
+    <div className="meter">
+      <div className="meter-label">
+        <span>{label}</span>
+        <span className={tone}>{Math.round(value)}</span>
+      </div>
+      <div className="meter-track">
+        <div className="meter-fill soft" style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
+      </div>
     </div>
   )
 }
@@ -64,28 +82,32 @@ function Traits({ traits }: { traits: Employee['traits'] }) {
 
 export function TeamPanel({ game, act, focusName }: { game: GameState; act: Act; focusName?: string | null }) {
   const [trainSkill, setTrainSkill] = useState<Skill>('tech')
+  const [firing, setFiring] = useState<string | null>(null)
   const full = game.staff.length >= capacity(game)
   return (
     <div className="panel-body">
       <h2>
-        Team {game.staff.length}/{capacity(game)}
+        Team
+        <span className="num">
+          {game.staff.length}/{capacity(game)} seats
+        </span>
       </h2>
       <p className="muted small">Monthly costs: {money(monthlyCosts(game))}</p>
       {game.staff.map((e) => (
         <div key={e.id} className={`person ${focusName && e.name.startsWith(focusName) ? 'highlight' : ''}`}>
           <div className="person-head">
             <b>{e.name}</b>
-            <span className="muted">
+            <span className="person-meta">
               {e.kind === 'founder' ? 'founder' : e.kind === 'friend' ? 'garage friend' : e.role} · {money(e.salary)}/mo
             </span>
           </div>
           <SkillRow person={e} />
           <Traits traits={e.traits} />
-          <div className="person-stats small">
-            <span>Morale {Math.round(e.morale)}</span>
-            <span className={e.stress > 60 ? 'bad' : undefined}>Stress {Math.round(e.stress)}</span>
-            {e.burnoutWeeks > 0 && <span className="bad">Burnout {e.burnoutWeeks}w</span>}
+          <div className="person-stats">
+            <Gauge label="Morale" value={e.morale} />
+            <Gauge label="Stress" value={e.stress} tone={e.stress > 60 ? 'bad' : undefined} />
           </div>
+          {e.burnoutWeeks > 0 && <p className="bad small">Burned out for {e.burnoutWeeks} more weeks.</p>}
           <div className="row">
             {game.research.includes('trainingRoom') && (
               <>
@@ -99,15 +121,27 @@ export function TeamPanel({ game, act, focusName }: { game: GameState; act: Act;
                 </button>
               </>
             )}
-            {e.kind !== 'founder' && (
-              <button
-                className="link"
-                onClick={() => {
-                  if (confirm(`Fire ${e.name}? It costs two months of salary.`)) act((s) => fire(s, e.id))
-                }}
-              >
+            {e.kind !== 'founder' && firing !== e.id && (
+              <button className="link" onClick={() => setFiring(e.id)}>
                 Fire
               </button>
+            )}
+            {firing === e.id && (
+              <>
+                <span className="small">Fire {e.name}? It costs two months of salary.</span>
+                <button
+                  className="danger"
+                  onClick={() => {
+                    setFiring(null)
+                    act((s) => fire(s, e.id))
+                  }}
+                >
+                  Fire
+                </button>
+                <button className="secondary" onClick={() => setFiring(null)}>
+                  Keep
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -118,7 +152,7 @@ export function TeamPanel({ game, act, focusName }: { game: GameState; act: Act;
         <div key={c.id} className="person candidate">
           <div className="person-head">
             <b>{c.name}</b>
-            <span className="muted">
+            <span className="person-meta">
               {c.role} · {money(c.salary)}/mo
             </span>
           </div>
@@ -147,7 +181,7 @@ export function ResearchPanel({ game, act }: { game: GameState; act: Act }) {
           <div key={id} className={`node ${done ? 'done' : open ? '' : 'locked'}`}>
             <div className="person-head">
               <b>{node.label}</b>
-              <span className="muted small">{done ? 'done' : `${node.rp} RP · ${money(node.cost)}`}</span>
+              <span className="person-meta">{done ? 'done' : `${node.rp} RP · ${money(node.cost)}`}</span>
             </div>
             <p className="small">{node.text}</p>
             {!done && open && (
@@ -169,9 +203,16 @@ export function BusinessPanel({ game, act }: { game: GameState; act: Act }) {
   return (
     <div className="panel-body">
       <h2>Business</h2>
-      <p className="small">
-        Weekly sales: <b>{money(weeklyIncome(game))}</b> · Monthly costs: <b>{money(monthlyCosts(game))}</b>
-      </p>
+      <dl className="facts">
+        <div>
+          <dt>Weekly sales</dt>
+          <dd>{money(weeklyIncome(game))}</dd>
+        </div>
+        <div>
+          <dt>Monthly costs</dt>
+          <dd>{money(monthlyCosts(game))}</dd>
+        </div>
+      </dl>
       {game.loan && (
         <p className="small bad">
           Rescue loan: {money(game.loan.weeklyPayment)} a week for {game.loan.weeksLeft} more weeks.
@@ -183,7 +224,7 @@ export function BusinessPanel({ game, act }: { game: GameState; act: Act }) {
         <div key={c.id} className="node">
           <div className="person-head">
             <b>{c.client}</b>
-            <span className="muted small">
+            <span className="person-meta">
               {money(c.pay)} · {c.weeksLeft} weeks
             </span>
           </div>
@@ -207,8 +248,11 @@ export function BusinessPanel({ game, act }: { game: GameState; act: Act }) {
       {game.office === 'garage' && !canMove(game, 'smallOffice') && <p className="muted small">Opens after your first profitable year.</p>}
       <h3>Platform licenses</h3>
       {game.platforms.map((p) => (
-        <p key={p} className="small">
-          ✓ {PLATFORMS[p].label} <span className="muted">({PLATFORMS[p].kind})</span>
+        <p key={p} className="line open">
+          <span className="mark">Own</span>
+          <span>
+            {PLATFORMS[p].label} <span className="muted">({PLATFORMS[p].kind})</span>
+          </span>
         </p>
       ))}
       {platforms.map((p) => (
@@ -218,8 +262,9 @@ export function BusinessPanel({ game, act }: { game: GameState; act: Act }) {
       ))}
       <h3>Engines</h3>
       {game.engines.map((e) => (
-        <p key={e} className="small">
-          ✓ {e === 'own' ? `Own engine, level ${game.ownEngine?.level}` : ENGINES[e].label}
+        <p key={e} className="line open">
+          <span className="mark">Own</span>
+          <span>{e === 'own' ? `Own engine, level ${game.ownEngine?.level}` : ENGINES[e].label}</span>
         </p>
       ))}
       {engines.map((e) => (
@@ -230,8 +275,9 @@ export function BusinessPanel({ game, act }: { game: GameState; act: Act }) {
       ))}
       <h3>Milestones</h3>
       {[...MILESTONES.map((m) => ({ id: m.id, text: m.text })), { id: 'profitableYear', text: 'First profitable year. A small office opens.' }].map((m) => (
-        <p key={m.id} className={`small ${game.milestones.includes(m.id) ? '' : 'muted'}`}>
-          {game.milestones.includes(m.id) ? '★' : '☆'} {m.text}
+        <p key={m.id} className={`line ${game.milestones.includes(m.id) ? 'open' : 'muted'}`}>
+          <span className="mark">{game.milestones.includes(m.id) ? 'Done' : '—'}</span>
+          <span>{m.text}</span>
         </p>
       ))}
     </div>
@@ -243,21 +289,34 @@ export function FansPanel({ game }: { game: GameState }) {
   return (
     <div className="panel-body">
       <h2>
-        Fans {moodFace(f.mood)}
+        Fans
+        <MoodFace mood={f.mood} size={26} />
       </h2>
-      <p>
-        <b>{count(game.fans)}</b> fans · mood <b>{Math.round(f.mood)}</b>/100
-      </p>
+      <dl className="facts">
+        <div>
+          <dt>Fans</dt>
+          <dd>{count(game.fans)}</dd>
+        </div>
+        <div>
+          <dt>Mood</dt>
+          <dd>{Math.round(f.mood)}/100</dd>
+        </div>
+      </dl>
       <div className="meter-track mood">
         <div className="meter-fill" style={{ width: `${f.mood}%` }} />
+      </div>
+      <div className="mood-scale">
+        <span>Review bomb</span>
+        <span>Fan art</span>
       </div>
       <p className="small">Fans expect a score of about <b>{expectationBefore(game.releases).toFixed(1)}</b> from your next game.</p>
       {f.reviewBombWeeks > 0 && <p className="bad small">Review bomb in progress: {f.reviewBombWeeks} weeks left.</p>}
       <h3>Demands</h3>
       {f.demands.length === 0 && <p className="muted small">Nobody demands anything. Enjoy it.</p>}
       {f.demands.map((d) => (
-        <p key={d.id} className="small">
-          📜 {d.text} <span className="muted">(open {game.week - d.openedWeek} weeks)</span>
+        <p key={d.id} className="line">
+          <span className="mark">{game.week - d.openedWeek}w</span>
+          <span>{d.text}</span>
         </p>
       ))}
       <p className="muted small">Mood above 80 brings fan art. Below 25, the next release gets review-bombed. A dev diary helps while you build.</p>
@@ -276,7 +335,7 @@ export function RivalsPanel({ game }: { game: GameState }) {
         <div key={r.id} className="node">
           <div className="person-head">
             <b>{r.name}</b>
-            <span className="muted small">{count(r.fans)} fans</span>
+            <span className="person-meta">{count(r.fans)} fans</span>
           </div>
           <p className="small muted">{r.genres.map((g) => GENRES[g].label).join(', ')}</p>
         </div>
@@ -284,15 +343,21 @@ export function RivalsPanel({ game }: { game: GameState }) {
       <h3>Recent releases</h3>
       {recent.length === 0 && <p className="muted small">Quiet so far.</p>}
       {recent.map((r, i) => (
-        <p key={`${r.title}-${i}`} className="small">
-          <b>{r.score}</b> {r.title} <span className="muted">· {game.rivals.find((x) => x.id === r.rivalId)?.name}</span>
+        <p key={`${r.title}-${i}`} className="line">
+          <span className="mark">{score(r.score)}</span>
+          <span>
+            {r.title} <span className="muted">· {game.rivals.find((x) => x.id === r.rivalId)?.name}</span>
+          </span>
         </p>
       ))}
       <h3>Golden Cartridge Awards</h3>
       {game.awards.length === 0 && <p className="muted small">The first show is in December.</p>}
       {[...game.awards].reverse().slice(0, 9).map((a, i) => (
-        <p key={i} className={`small ${a.player ? 'good' : ''}`}>
-          {a.player ? '🏆' : '·'} {a.year} {a.category}: "{a.title}" ({a.winner})
+        <p key={i} className={`line ${a.player ? 'won' : ''}`}>
+          <span className="mark">{a.year}</span>
+          <span>
+            {a.category}: "{a.title}" <span className="muted">({a.winner})</span>
+          </span>
         </p>
       ))}
     </div>
@@ -304,8 +369,9 @@ export function LogPanel({ game }: { game: GameState }) {
     <div className="panel-body">
       <h2>Studio log</h2>
       {[...game.log].reverse().slice(0, 60).map((entry, i) => (
-        <p key={i} className={`small log-${entry.tone ?? 'plain'}`}>
-          <span className="muted">{dateLabel(entry.week)}</span> {entry.text}
+        <p key={i} className={`log-line log-${entry.tone ?? 'plain'}`}>
+          <span className="num">{dateLabel(entry.week).replace(/^(\w{3})\w*/, '$1')}</span>
+          <span>{entry.text}</span>
         </p>
       ))}
     </div>
@@ -318,13 +384,17 @@ export function ReleasesPanel({ game, onOpen }: { game: GameState; onOpen: (id: 
       <h2>Your games</h2>
       {game.releases.length === 0 && <p className="muted small">No games yet. The garage waits.</p>}
       {[...game.releases].reverse().map((r) => (
-        <button key={r.id} className="release-row" onClick={() => onOpen(r.id)}>
-          <b>{r.score}</b>
-          <span>{r.title}</span>
-          <span className="muted small">
-            {count(r.totalSales)} sold · {money(r.revenue)}
-          </span>
-        </button>
+        <div key={r.id} className="release-item">
+          <button className="release-row" onClick={() => onOpen(r.id)}>
+            <b>{score(r.score)}</b>
+            <span>{r.title}</span>
+            <span className="person-meta" style={{ textAlign: 'left' }}>
+              {dateLabel(r.week)} · {count(r.totalSales)} sold · {money(r.revenue)}
+            </span>
+          </button>
+          <Badges badges={r.badges} />
+          {r.totalSales > 0 && <RegionBars release={r} />}
+        </div>
       ))}
     </div>
   )

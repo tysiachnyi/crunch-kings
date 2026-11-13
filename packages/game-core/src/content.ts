@@ -1,6 +1,38 @@
-import type { EngineId, Focus, Genre, PlatformId, ResearchId, Skill, Tag, Topic, Trait } from './types'
+import type { EngineId, Focus, Genre, PlatformId, RegionId, ResearchId, Skill, Tag, Topic, Trait } from './types'
 
 export const SKILLS: Skill[] = ['design', 'tech', 'art', 'sound', 'story', 'polish']
+
+export type PhaseAspect = { label: string; text: string; skill: Skill }
+
+export const PHASES: { label: string; text: string; aspects: [PhaseAspect, PhaseAspect, PhaseAspect] }[] = [
+  {
+    label: 'Foundation',
+    text: 'Build the base that the rest of the game stands on.',
+    aspects: [
+      { label: 'Code base', text: 'Engine, tools and fast loading.', skill: 'tech' },
+      { label: 'Core loop', text: 'The one thing the player does again and again.', skill: 'design' },
+      { label: 'Plot', text: 'The story, the hero and the world.', skill: 'story' },
+    ],
+  },
+  {
+    label: 'Content',
+    text: 'Fill the game with things to see and hear.',
+    aspects: [
+      { label: 'Levels', text: 'Maps, puzzles and challenges.', skill: 'design' },
+      { label: 'Artwork', text: 'Sprites, backgrounds and animation.', skill: 'art' },
+      { label: 'Music', text: 'Tunes and sound effects.', skill: 'sound' },
+    ],
+  },
+  {
+    label: 'Finish',
+    text: 'Make the game ready for the shop shelf.',
+    aspects: [
+      { label: 'Bug hunt', text: 'Find the bugs and fix them.', skill: 'polish' },
+      { label: 'Visual effects', text: 'Explosions, sparks and screen shake.', skill: 'art' },
+      { label: 'Audio mix', text: 'Balance the volume of every sound.', skill: 'sound' },
+    ],
+  },
+]
 
 export const GENRES: Record<Genre, { label: string; year: number; tags: Tag[]; ideal: Focus }> = {
   arcade: { label: 'Arcade Action', year: 1980, tags: ['action'], ideal: { design: 25, tech: 25, art: 20, sound: 15, story: 0, polish: 15 } },
@@ -9,8 +41,8 @@ export const GENRES: Record<Genre, { label: string; year: number; tags: Tag[]; i
   sports: { label: 'Sports', year: 1980, tags: ['action', 'social'], ideal: { design: 20, tech: 30, art: 20, sound: 10, story: 0, polish: 20 } },
   racing: { label: 'Racing', year: 1985, tags: ['action'], ideal: { design: 15, tech: 35, art: 20, sound: 15, story: 0, polish: 15 } },
   shooter: { label: 'Shooter', year: 1985, tags: ['action'], ideal: { design: 20, tech: 30, art: 20, sound: 15, story: 0, polish: 15 } },
-  adventure: { label: 'Adventure', year: 1985, tags: ['story', 'brains', 'world'], ideal: { design: 20, tech: 10, art: 20, sound: 10, story: 30, polish: 10 } },
-  rpg: { label: 'RPG', year: 1985, tags: ['story', 'world', 'brains'], ideal: { design: 25, tech: 15, art: 15, sound: 10, story: 25, polish: 10 } },
+  adventure: { label: 'Adventure', year: 1985, tags: ['story', 'brains', 'world'], ideal: { design: 22, tech: 8, art: 22, sound: 12, story: 26, polish: 10 } },
+  rpg: { label: 'RPG', year: 1985, tags: ['story', 'world', 'brains'], ideal: { design: 28, tech: 10, art: 17, sound: 12, story: 23, polish: 10 } },
 }
 
 export const TOPICS: Record<Topic, { label: string; year: number; tags: Tag[] }> = {
@@ -179,4 +211,56 @@ export const FAN_LETTERS = [
   'Dear {studio}, I drew your hero on my school bag. My teacher was not happy. I was.',
   'My dad and I play your game every Sunday. He always loses. Thank you.',
   'I named my hamster after your studio. He is very fast.',
+]
+
+export const REGIONS: Record<RegionId, { label: string; short: string; share: number; genres: Partial<Record<Genre, number>>; tags: Partial<Record<Tag, number>> }> = {
+  usa: {
+    label: 'the USA',
+    short: 'USA',
+    share: 0.34,
+    genres: { arcade: 1.15, sports: 1.3, shooter: 1.2, puzzle: 0.85, platformer: 0.95 },
+    tags: { action: 1.15, social: 1.1 },
+  },
+  japan: {
+    label: 'Japan',
+    short: 'Japan',
+    share: 0.2,
+    genres: { rpg: 1.45, platformer: 1.35, puzzle: 1.2, arcade: 1.15, adventure: 1.15, sports: 0.7, racing: 0.85, shooter: 0.8 },
+    tags: { story: 1.2, world: 1.2, action: 0.95 },
+  },
+  germany: {
+    label: 'Germany',
+    short: 'Germany',
+    share: 0.14,
+    genres: { puzzle: 1.3, racing: 1.25, adventure: 1.15, rpg: 1.1, sports: 0.9, arcade: 0.85, shooter: 0.8 },
+    tags: { brains: 1.2, story: 1.1, action: 0.9 },
+  },
+  uk: {
+    label: 'the United Kingdom',
+    short: 'United Kingdom',
+    share: 0.12,
+    genres: { sports: 1.3, adventure: 1.25, arcade: 1.1, puzzle: 1.05, shooter: 0.9 },
+    tags: { social: 1.15, story: 1.1 },
+  },
+  france: {
+    label: 'France',
+    short: 'France',
+    share: 0.1,
+    genres: { adventure: 1.35, puzzle: 1.2, rpg: 1.1, sports: 0.9, shooter: 0.85 },
+    tags: { story: 1.2, brains: 1.1, action: 0.9 },
+  },
+  brazil: {
+    label: 'Brazil',
+    short: 'Brazil',
+    share: 0.1,
+    genres: { sports: 1.5, racing: 1.25, arcade: 1.1, platformer: 1.1, puzzle: 0.8, rpg: 0.8 },
+    tags: { social: 1.2, action: 1.1 },
+  },
+}
+
+export const UNIT_TIERS: { id: string; label: string; text: string }[] = [
+  { id: 'cult', label: 'Cult favorite', text: 'A small crowd loves it.' },
+  { id: 'big', label: 'Big seller', text: 'Shops cannot keep it on the shelf.' },
+  { id: 'smash', label: 'Smash hit', text: 'Everybody has a copy.' },
+  { id: 'legend', label: 'Legend', text: 'People will talk about it for years.' },
 ]
